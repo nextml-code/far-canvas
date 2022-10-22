@@ -1,0 +1,13 @@
+body {
+    background: #CEF;
+}
+
+div {
+  display: inline-block;
+}
+#reference_container {
+    border: solid green 1px;
+}
+#far_container {
+    border: solid red 1px;
+}
