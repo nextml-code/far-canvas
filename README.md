@@ -1,6 +1,6 @@
 # far-canvas
 
-<why>
+## Motivation
 
 For example: translated `100'000'000px` away from the center (and a scaling of 1.5) and rendering the objects that far away:
 
@@ -30,4 +30,17 @@ For example: translated `100'000'000px` away from the center (and a scaling of 1
 
 ## install
 
+```bash
+npm install @nextml/far-canvas
+```
+
 ## usage
+
+```javascript
+
+```
+
+## update version
+```bash
+npm version patch | minor | major
+```

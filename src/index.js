@@ -1,4 +1,9 @@
-const getFarContext2d = function (canvas, d = {dx: 0, dy: 0, scale: 1}) {
+const isDefined = (o) => ![null, undefined].includes(o);
+
+const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1} = {}) => {
+    const d = { x, y, scale };
+    const _context = canvas.getContext("2d");
+
     const s = {
         x: x => d.scale * (x + d.x),
         y: y => d.scale * (y + d.y),
@@ -10,17 +15,15 @@ const getFarContext2d = function (canvas, d = {dx: 0, dy: 0, scale: 1}) {
         }
     };
 
-    const _context = canvas.getContext("2d");
-
 	return {
         translate(x, y) {
-            throw new Error('transform not supported');
+            throw new Error("transform not supported");
         },
         scale(x, y) {
-            throw new Error('transform not supported');
+            throw new Error("transform not supported");
         },
         transform(a, b, c, d, e, f) {
-            throw new Error('transform not supported');
+            throw new Error("transform not supported");
         },
         save() {
             return _context.save();
@@ -37,7 +40,7 @@ const getFarContext2d = function (canvas, d = {dx: 0, dy: 0, scale: 1}) {
                 return _context.drawImage(image, s.x(dx), s.y(dy), s.distance(dWidth), s.distance(dHeight));
             } else if (args.length === 8) {
                 const [sx, sy, sWidth, sHeight, dx, dy] = args;
-                throw new Error('drawImage(sx, sy, sWidth, sHeight, dx, dy) not implemented');
+                throw new Error("drawImage(sx, sy, sWidth, sHeight, dx, dy) not implemented");
             }
         },
         fillRect(x, y, width, height) {
@@ -78,3 +81,13 @@ const getFarContext2d = function (canvas, d = {dx: 0, dy: 0, scale: 1}) {
         s,
     }
 };
+
+export const far = (canvas, { x = 0, y = 0, scale = 1 } = {}) => ({
+    getContext: (contextType, contextAttribute) => {
+        if (contextType == "2d" && !isDefined(contextAttribute)) {
+            return getFarContext2d(canvas, {x, y, scale});
+        } else {
+            throw new Error("getContext(contextType != \"2d\") not implemented");
+        }
+    }
+});

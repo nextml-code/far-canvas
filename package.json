@@ -1,0 +1,35 @@
+{
+  "name": "@nextml/far-canvas",
+  "version": "0.2.0",
+  "description": "Fixes web html5 canvas for big translations (100Mpx)",
+  "main": "lib/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "dist": "rollup src/index.js --file lib/index.js --format cjs",
+    "pretest": "npm run dist",
+    "test": "jest --verbose"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nextml-code/far-canvas.git"
+  },
+  "keywords": [
+    "canvas",
+    "translation",
+    "fix",
+    "html5"
+  ],
+  "author": "nextml",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/nextml-code/far-canvas/issues"
+  },
+  "homepage": "https://github.com/nextml-code/far-canvas#readme",
+  "devDependencies": {
+    "jest": "^29.2.1",
+    "prettier": "^2.7.1",
+    "rollup": "^3.2.3"
+  }
+}
