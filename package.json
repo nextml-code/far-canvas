@@ -9,7 +9,8 @@
   "scripts": {
     "dist": "rollup src/index.js --file lib/index.js --format cjs",
     "pretest": "npm run dist",
-    "test": "jest --verbose"
+    "test": "jest --verbose",
+    "example": "live-server example"
   },
   "repository": {
     "type": "git",
@@ -29,6 +30,7 @@
   "homepage": "https://github.com/nextml-code/far-canvas#readme",
   "devDependencies": {
     "jest": "^29.2.1",
+    "live-server": "^1.2.2",
     "prettier": "^2.7.1",
     "rollup": "^3.2.3"
   }

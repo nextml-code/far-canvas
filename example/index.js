@@ -1,19 +1,29 @@
-function getReferenceContext2d(element, d = {dx: 0, dy: 0, scale: 1}) {
-  const ctx = element.getContext("2d");
-  ctx.scale(scale, scale);
-  ctx.translate(d.x, d.y);
-  return ctx;
+import { far } from "../lib/index.js";
+
+
+function getReferenceContext2d(element, transform) {
+    const context = element.getContext("2d");
+    context.scale(transform.scale, transform.scale);
+    context.translate(transform.x, transform.y);
+
+    return context;
 };
+
+function getFarContext2d(element, transform) {
+    const context = far(element, transform).getContext("2d");
+
+    return context;
+}
+
+const referenceCanvas = document.getElementById('reference');
+const farCanvas = document.getElementById('far');
 
 const canvasDimensions = {width: 800, height: 600};
 
-const reference = document.getElementById('reference');
-const far = document.getElementById('far');
-
-reference.width = canvasDimensions.width;
-reference.height = canvasDimensions.height;
-far.width = canvasDimensions.width;
-far.height = canvasDimensions.height;
+referenceCanvas.width = canvasDimensions.width;
+referenceCanvas.height = canvasDimensions.height;
+farCanvas.width = canvasDimensions.width;
+farCanvas.height = canvasDimensions.height;
 
 const image = {data: document.createElement('img'), width: 200, height: 158};
 
@@ -34,11 +44,11 @@ const rectangles = [
     { x: 100, y: focus + 250, width: 200, height: 30 },
 ];
 
-var ctxReference = getReferenceContext2d(
+const contextReference = getReferenceContext2d(
 	document.getElementById('reference'),
     { x: 0, y: -focus, scale: scale }
 );
-var ctxFar = getFarContext2d(
+const contextFar = getFarContext2d(
 	document.getElementById('far'),
     { x: 0, y: -focus, scale: scale }
 );
@@ -47,11 +57,14 @@ image.data.onload = function () {
 	function render(ctx) {
     	images.forEach(image => {
             ctx.save();
+
             ctx.drawImage(image.data, image.x, image.y, image.width, image.height);
+
             ctx.restore();
         });
         rectangles.forEach(rectangle => {
             ctx.save();
+
             ctx.fillStyle = "#CE0";
             ctx.fillRect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
             ctx.strokeStyle = "#803";
@@ -64,12 +77,13 @@ image.data.onload = function () {
             ctx.moveTo(rectangle.x + rectangle.width, rectangle.y);
             ctx.lineTo(rectangle.x, rectangle.y + rectangle.height);
             ctx.stroke();
+
             ctx.restore();
         });
     }
 
-    render(ctxReference);
-    render(ctxFar);
+    render(contextReference);
+    render(contextFar);
 
 }
 image.data.src = "http://i.imgur.com/gwlPu.jpg";

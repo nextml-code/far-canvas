@@ -1,6 +1,5 @@
 const { far } = require("../lib/index.js");
 
-
 test.each([
     [{}, 128],
     [{}, -64],
