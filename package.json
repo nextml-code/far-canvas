@@ -10,7 +10,8 @@
     "dist": "rollup src/index.js --file lib/index.js --format cjs",
     "pretest": "npm run dist",
     "test": "jest --verbose",
-    "example": "live-server example"
+    "preexample": "npm run dist",
+    "example": "live-server --open=example ."
   },
   "repository": {
     "type": "git",

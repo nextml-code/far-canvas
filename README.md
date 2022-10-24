@@ -37,10 +37,16 @@ npm install @nextml/far-canvas
 ## usage
 
 ```javascript
-
+<FIXME>
 ```
 
-## update version
+## development
+### run exampl
+```bash
+npm run example
+```
+
+### update version
 ```bash
 npm version patch | minor | major
 ```
