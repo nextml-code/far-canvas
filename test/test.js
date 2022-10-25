@@ -1,4 +1,5 @@
-const { far } = require("../lib/index.js");
+const { far } = require("../lib.cjs/index.js");
+
 
 test.each([
     [{}, 128],

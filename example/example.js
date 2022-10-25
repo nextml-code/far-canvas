@@ -1,6 +1,3 @@
-import { far } from "../lib/index.js";
-
-
 function getReferenceContext2d(element, transform) {
     const context = element.getContext("2d");
     context.scale(transform.scale, transform.scale);
@@ -10,7 +7,7 @@ function getReferenceContext2d(element, transform) {
 };
 
 function getFarContext2d(element, transform) {
-    const context = far(element, transform).getContext("2d");
+    const context = far.far(element, transform).getContext("2d");
 
     return context;
 }
@@ -18,14 +15,14 @@ function getFarContext2d(element, transform) {
 const referenceCanvas = document.getElementById('reference');
 const farCanvas = document.getElementById('far');
 
-const canvasDimensions = {width: 800, height: 600};
+const canvasDimensions = {width: 700, height: 500};
 
 referenceCanvas.width = canvasDimensions.width;
 referenceCanvas.height = canvasDimensions.height;
 farCanvas.width = canvasDimensions.width;
 farCanvas.height = canvasDimensions.height;
 
-const image = {data: document.createElement('img'), width: 200, height: 158};
+const image = {data: document.createElement('img'), width: 300, height: 150};
 
 const focus = 100000000; // NOTE 500000000 breaks down in vanilla canvas
 const scale = 1.5;
@@ -37,11 +34,15 @@ const images = [
 	mkImage({ x: 0, y: focus + 0*image.height, image }),
     mkImage({ x: 0, y: focus + 1*image.height, image }),
     mkImage({ x: 0, y: focus + 2*image.height, image }),
+    mkImage({ x: 0, y: focus + 3*image.height, image }),
+    mkImage({ x: 0, y: focus + 4*image.height, image }),
 ];
 
 const rectangles = [
 	{ x: 10, y: focus + 20, width: 200, height: 30 },
     { x: 100, y: focus + 250, width: 200, height: 30 },
+    { x: -10, y: focus - 10, width: 200, height: 30 },
+    { x: 100, y: focus + 400, width: 200, height: 30 },
 ];
 
 const contextReference = getReferenceContext2d(
@@ -86,4 +87,4 @@ image.data.onload = function () {
     render(contextFar);
 
 }
-image.data.src = "http://i.imgur.com/gwlPu.jpg";
+image.data.src = "https://docs.gimp.org/2.6/en/images/tutorials/quickie-jpeg-example.jpg";

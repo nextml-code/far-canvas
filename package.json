@@ -2,15 +2,17 @@
   "name": "@nextml/far-canvas",
   "version": "0.2.0",
   "description": "Fixes web html5 canvas for big translations (100Mpx)",
-  "main": "lib/index.js",
+  "main": "lib.cjs/index.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "dist": "rollup src/index.js --file lib/index.js --format cjs",
-    "pretest": "npm run dist",
+    "dist": "npm run dist::cjs && npm run dist::web",
+    "dist::cjs": "rollup src/index.js --file lib.cjs/index.js --format cjs",
+    "dist::web": "rollup src/index.js --file lib.web/index.js --format iife --name far",
+    "pretest": "npm run dist::cjs",
     "test": "jest --verbose",
-    "preexample": "npm run dist",
+    "preexample": "npm run dist::web",
     "example": "live-server --open=example ."
   },
   "repository": {
