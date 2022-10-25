@@ -15,7 +15,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1} = {}) => {
         }
     };
 
-    _context.lineWidth = s.distance(1);
+    _context.lineWidth = s.distance(_context.lineWidth);
+    // FIXME text default size
 
     const notSupported = (name) => {
         throw new Error(`${name} not supported`);
