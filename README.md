@@ -35,9 +35,26 @@ npm install @nextml/far-canvas
 ```
 
 ## usage
-
+### Node
 ```javascript
-<FIXME>
+const { far } = require("../lib.cjs/index.js");
+
+const farAway = 100000000;
+const context = far(canvas, {y: -farAway, scale: 2}).getContext("2d");
+
+context.fillRect(32, farAway + 16, 128, 128);
+...
+```
+
+### Web
+```javascript
+const canvas = document.getElementById('far');
+
+const farAway = 100000000;
+const context = far.far(canvas, {y: -farAway, scale: 2}).getContext("2d");
+
+context.fillRect(32, farAway + 16, 128, 128);
+...
 ```
 
 ## development
