@@ -19,9 +19,19 @@ test.each([
     (transform, t) => {
         let numDigits = 7;
 
+        const data = { lineWidth: 1 };
+        const mockContext = {
+            get lineWidth() {
+                return data.lineWidth;
+            },
+            set lineWidth(lineWidth) {
+                data.lineWidth = lineWidth;
+            },
+        };
+
         let context = far(
             {
-                getContext: jest.fn().mockReturnValue(undefined),
+                getContext: jest.fn().mockReturnValue(mockContext),
             },
             transform
         ).getContext("2d");
@@ -43,7 +53,18 @@ test.each([
 ])(
     "calls canvas.getContext",
     (transform) => {
-    const getContext = jest.fn();
+
+    const data = { lineWidth: 1 };
+    const mockContext = {
+        get lineWidth() {
+            return data.lineWidth;
+        },
+        set lineWidth(lineWidth) {
+            data.lineWidth = lineWidth;
+        },
+    };
+    const getContext = jest.fn().mockReturnValue(mockContext);
+
     const context = far(
         {
             getContext,
@@ -72,8 +93,15 @@ test.each([
     const context = far(
         {
             getContext() {
+                var data = { lineWidth: 1 };
                 return {
                     drawImage,
+                    get lineWidth() {
+                        return data.lineWidth;
+                    },
+                    set lineWidth(lineWidth) {
+                        data.lineWidth = lineWidth;
+                    },
                 };
             },
         },
@@ -97,8 +125,15 @@ test.each([
         const context = far(
             {
                 getContext() {
+                    const data = { lineWidth: 1 };
                     return {
                         methodName: method,
+                        get lineWidth() {
+                            return data.lineWidth;
+                        },
+                        set lineWidth(lineWidth) {
+                            data.lineWidth = lineWidth;
+                        },
                     };
                 },
             },
@@ -111,31 +146,35 @@ test.each([
 )
 
 test.each([
-    ["lineWidth", { scale: 2 }, 4 , 8 ],
+    [{ scale: 2 }, 4 , 8 ],
 ])(
     "get/set width",
-    (attributeName, transform, value, valueTransformed) => {
+    (transform, value, valueTransformed) => {
         let numDigits = 7;
 
-        const attribute = jest.fn().mockReturnValue();
+        const attribute = jest.fn().mockReturnValue(value);
         const context = far(
             {
                 getContext() {
+                    const data = { lineWidth: 1 };
+
                     return {
-                        get [attributeName]() {
+                        get lineWidth() {
                             return attribute();
                         },
-                        set [attributeName](parameter) {
+                        set lineWidth(parameter) {
                             return attribute(parameter);
-                        }
+                        },
+
                     };
                 },
             },
             transform
         ).getContext("2d");
 
-        context[attributeName] = value;
-        expect(attribute).toHaveBeenCalledTimes(1);
+        expect(attribute).toHaveBeenCalledTimes(2); // NOTE get + set in init
+        context.lineWidth = value;
+        expect(attribute).toHaveBeenCalledTimes(3);
         expect(attribute).toHaveBeenCalledWith(valueTransformed);
     }
 )
