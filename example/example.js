@@ -15,17 +15,19 @@ function getFarContext2d(element, transform) {
 const referenceCanvas = document.getElementById('reference');
 const farCanvas = document.getElementById('far');
 
-const canvasDimensions = {width: 700, height: 500};
+const image = {data: document.createElement('img'), width: 300, height: 150};
+const canvasDimensions = {width: 700, height: 1200};
 
 referenceCanvas.width = canvasDimensions.width;
 referenceCanvas.height = canvasDimensions.height;
 farCanvas.width = canvasDimensions.width;
 farCanvas.height = canvasDimensions.height;
 
-const image = {data: document.createElement('img'), width: 300, height: 150};
 
-const focus = 100000000; // NOTE 500000000 breaks down in vanilla canvas
-const scale = 1.5;
+const scale = canvasDimensions.width / image.width;
+const focus = 10000; // 500000000 // breaks down in vanilla canvas
+
+const diff = -image.height * 0;
 
 const mkImage = ({x, y, image}) => ({ x , y, data: image.data, width: image.width, height: image.height});
 
@@ -43,15 +45,16 @@ const rectangles = [
     { x: 100, y: focus + 250, width: 200, height: 30 },
     { x: -10, y: focus - 10, width: 200, height: 30 },
     { x: 100, y: focus + 400, width: 200, height: 30 },
+    { x: 0, y: focus + 2 * image.height, width: image.width, height: image.height },
 ];
 
 const contextReference = getReferenceContext2d(
 	document.getElementById('reference'),
-    { x: 0, y: -focus, scale: scale }
+    { x: 0, y: -focus - diff, scale: scale }
 );
 const contextFar = getFarContext2d(
 	document.getElementById('far'),
-    { x: 0, y: -focus, scale: scale }
+    { x: 0, y: -focus - diff, scale: scale }
 );
 
 image.data.onload = function () {
@@ -60,6 +63,11 @@ image.data.onload = function () {
             ctx.save();
 
             ctx.drawImage(image.data, image.x, image.y, image.width, image.height);
+            ctx.beginPath();
+            ctx.strokeStyle = "#803";
+            ctx.lineWidth = 1;
+            ctx.rect(image.x, image.y, image.width, image.height);
+            ctx.stroke();
 
             ctx.restore();
         });
