@@ -120,14 +120,14 @@ test.each([
     ["scale", []],
 ])(
     "not supported transform operations",
-    (methodName, methodArgs) => {
+    (name, args) => {
         const method = jest.fn();
         const context = far(
             {
                 getContext() {
                     const data = { lineWidth: 1 };
                     return {
-                        methodName: method,
+                        [name]: method,
                         get lineWidth() {
                             return data.lineWidth;
                         },
@@ -140,7 +140,11 @@ test.each([
             { x: 3, y: 0, scale: 1.5}
         ).getContext("2d");
 
-        expect(() => context[methodName](...methodArgs)).toThrow()
+        const contextMethod = context[name];
+
+        expect(() => contextMethod(...args)).toThrow()
+    }
+)
 
     }
 )
