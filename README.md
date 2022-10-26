@@ -1,6 +1,12 @@
 # far-canvas
 
-## Motivation
+## install
+
+```bash
+npm install @nextml/far-canvas
+```
+
+## motivation
 
 For example: translated `100'000'000px` away from the center (and a scaling of 1.5) and rendering the objects that far away:
 
@@ -27,12 +33,6 @@ For example: translated `100'000'000px` away from the center (and a scaling of 1
 
 1. Images, rectangles and lines are all missaligned.
 2. `lineWidth=8px` is not rendered correctly.
-
-## install
-
-```bash
-npm install @nextml/far-canvas
-```
 
 ## usage
 ### Node
