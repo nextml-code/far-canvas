@@ -116,8 +116,12 @@ test.each([
 
 test.each([
     ["transform", []],
+    ["getTransform", []],
+    ["setTransform", []],
+    ["resetTransform", []],
     ["translate", []],
     ["scale", []],
+    ["rotate", []],
 ])(
     "not supported transform operations",
     (name, args) => {
@@ -146,6 +150,37 @@ test.each([
     }
 )
 
+test.each([
+    ["save", []],
+    ["restore", []],
+    ["beginPath", []],
+    ["closePath", []],
+    ["getContextAttributes", []],
+])(
+    "method just wrapped",
+    (name, args) => {
+        const method = jest.fn().mockReturnValue("return");
+        const context = far(
+            {
+                getContext() {
+                    const data = { lineWidth: 1 };
+                    return {
+                        [name]: method,
+                        get lineWidth() {
+                            return data.lineWidth;
+                        },
+                        set lineWidth(lineWidth) {
+                            data.lineWidth = lineWidth;
+                        },
+                    };
+                },
+            },
+            { x: 3, y: 0, scale: 1.5}
+        ).getContext("2d");
+        context[name](...args);
+        expect(method).toHaveBeenCalledTimes(1);
+        expect(method).toHaveBeenCalledWith(...args);
+        expect(method).toReturnWith("return");
     }
 )
 
