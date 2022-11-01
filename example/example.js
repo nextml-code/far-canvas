@@ -103,6 +103,14 @@ image.data.onload = function () {
       ctx.stroke();
       ctx.restore();
 
+      ctx.save();
+      ctx.fillStyle = "#F08";
+      ctx.fillText("example", rectangle.x, rectangle.y + 10);
+      ctx.font = "bold 48px serif";
+      ctx.strokeStyle = "#0F8";
+      ctx.strokeText("far", rectangle.x, rectangle.y + 48);
+      ctx.restore();
+
       ctx.restore();
     });
   }

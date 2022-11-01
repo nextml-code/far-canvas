@@ -23,7 +23,7 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
   };
 
   _context.lineWidth = s.distance(_context.lineWidth);
-  // FIXME text default size
+  _context.font = `${s.distance(10)}px sans-serif`;
 
   const notSupported = (name) => {
     throw new Error(`${name} not supported`);
@@ -32,9 +32,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
     throw new Error(`${name} not implemented yet`);
   };
 
-  /* FIXME
-    - font
-    - all text stuff
+  /* TODO
+    - measureText
     - Path2d, farContext.Path2D ?
     */
 
@@ -67,10 +66,32 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       notImplementedYet("filter");
     },
     get font() {
-      notImplementedYet("font");
+      const font_ = _context.font.split(" ").filter((a) => a.trim());
+
+      if (![2, 3].includes(font_.length)) {
+        notSupported("font(!'[<style> ]<size> <face>')");
+      } else {
+        const [style, size, face] = font_.length == 3 ? font_ : ["", ...font_];
+
+        const sizeValue = parseFloat(size.match(/[0-9\.]/g).join(""));
+        const sizeUnit = size.match(/[A-Za-z]/g).join("");
+
+        return `${style} ${s.inv.distance(sizeValue)}${sizeUnit} ${face}`;
+      }
     },
     set font(font) {
-      notImplementedYet("font");
+      const font_ = font.split(" ").filter((a) => a.trim());
+
+      if (![2, 3].includes(font_.length)) {
+        notSupported("font(!'[<style> ]<size> <face>')");
+      } else {
+        const [style, size, face] = font_.length == 3 ? font_ : ["", ...font_];
+
+        const sizeValue = parseFloat(size.match(/[0-9\.]/g).join(""));
+        const sizeUnit = size.match(/[A-Za-z]/g).join("");
+
+        _context.font = `${style} ${s.distance(sizeValue)}${sizeUnit} ${face}`;
+      }
     },
     get fontKerning() {
       return _context.fontKerning;
@@ -228,7 +249,7 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       if (args.length === 0) {
         return _context.clip();
       } else if (typeof args[0] === "object") {
-        // FIXME Path2D
+        // TODO Path2D
         notImplementedYet("clip(Path2D, .)");
       } else {
         return _context.clip(...args);
@@ -316,7 +337,7 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       if (args.length === 0) {
         return _context.fill();
       } else if (typeof args[0] === "object") {
-        // FIXME Path2D
+        // TODO Path2D
         notImplementedYet("fill(Path2D, .)");
       } else {
         return _context.fill(...args);
@@ -330,8 +351,13 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
         s.distance(height)
       );
     },
-    fillText(text, x, y, maxWidth) {
-      return _context.fillText(text, s.x(x), s.y(y), s.distance(maxWidth));
+    fillText(text, x, y, maxWidth = undefined) {
+      return _context.fillText(
+        text,
+        s.x(x),
+        s.y(y),
+        isDefined(maxWidth) ? s.distance(maxWidth) : undefined
+      );
     },
     getContextAttributes() {
       return _context.getContextAttributes();
@@ -420,8 +446,13 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
         s.distance(height)
       );
     },
-    strokeText(text, x, y, maxWidth) {
-      return _context.strokeText(text, s.x(x), s.y(y), s.distance(maxWidth));
+    strokeText(text, x, y, maxWidth = undefined) {
+      return _context.strokeText(
+        text,
+        s.x(x),
+        s.y(y),
+        isDefined(maxWidth) ? s.distance(maxWidth) : undefined
+      );
     },
     transform(a, b, c, d, e, f) {
       notSupported("transform");
