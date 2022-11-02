@@ -70,7 +70,7 @@ const context = far.far(canvas, {y: -farAway, scale: 2}).getContext("2d");
 
 ## development
 
-### run exampl
+### run example
 
 ```bash
 npm run example
