@@ -295,7 +295,13 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
     drawImage(image, ...args) {
       if (args.length === 2) {
         const [dx, dy] = args;
-        return _context.drawImage(image, s.x(dx), s.y(dy));
+        return _context.drawImage(
+          image,
+          s.x(dx),
+          s.y(dy),
+          s.distance(image.width),
+          s.distance(image.height)
+        );
       } else if (args.length === 4) {
         const [dx, dy, dWidth, dHeight] = args;
         return _context.drawImage(
