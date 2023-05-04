@@ -70,10 +70,20 @@ const contextFar = getFarContext2d(document.getElementById("far"), {
 
 image.data.onload = function () {
   function render(ctx) {
-    images.forEach((image) => {
+    images.forEach((image, i) => {
       ctx.save();
 
-      ctx.drawImage(image.data, image.x, image.y, image.width, image.height);
+      if (i == 1) {
+        ctx.drawImage(image.data, image.x, image.y);
+      } else {
+        ctx.drawImage(
+          image.data,
+          image.x,
+          image.y,
+          image.width - i * 32,
+          image.height
+        );
+      }
       ctx.beginPath();
       ctx.strokeStyle = "#803";
       ctx.lineWidth = 1;
