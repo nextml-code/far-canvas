@@ -276,8 +276,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
     createLinearGradient(x0, y0, x1, y1) {
       return _context.createLinearGradient(s.x(x0), s.y(y0), s.x(x1), s.y(y1));
     },
-    createPattern(image, repetition) {
-      notImplementedYet("createPattern");
+    createPattern(...args) {
+      return _context.createPattern(...args)
     },
     createRadialGradient(x0, y0, r0, x1, y1, r1) {
       return _context.createRadialGradient(
