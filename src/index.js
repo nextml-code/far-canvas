@@ -323,9 +323,10 @@ const getFarContext2d = (
       );
       _context.rotate(d.rotation.angle);
 
+      let value;
       if (args.length === 2) {
         const [dx, dy] = args;
-        return _context.drawImage(
+        value = _context.drawImage(
           image,
           s.x(dx),
           s.y(dy),
@@ -334,7 +335,7 @@ const getFarContext2d = (
         );
       } else if (args.length === 4) {
         const [dx, dy, dWidth, dHeight] = args;
-        return _context.drawImage(
+        value = _context.drawImage(
           image,
           s.x(dx),
           s.y(dy),
@@ -347,6 +348,8 @@ const getFarContext2d = (
         notImplementedYet("drawImage(sx, sy, sWidth, sHeight, dx, dy)");
       }
       _context.restore();
+
+      return value;
     },
     ellipse(
       x,
