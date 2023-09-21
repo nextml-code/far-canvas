@@ -1,3 +1,5 @@
+import { far } from "../src/index.js";
+
 const canvasDimensions = { width: 700, height: 1200 };
 
 function getReferenceContext2d(element, transform) {
@@ -8,12 +10,13 @@ function getReferenceContext2d(element, transform) {
   context.translate(transform.rotation.x, transform.rotation.y);
   context.rotate(transform.rotation.angle);
   context.translate(-transform.rotation.x, -transform.rotation.y);
+  // context.scale(-1, -1);
 
   return context;
 }
 
 function getFarContext2d(element, transform) {
-  const context = far.far(element, transform).getContext("2d");
+  const context = far(element, transform).getContext("2d");
 
   return context;
 }
@@ -23,20 +26,22 @@ const farCanvas = document.getElementById("far");
 
 const image = { data: document.createElement("img"), width: 320, height: 164 };
 
-referenceCanvas.width = canvasDimensions.width;
-referenceCanvas.height = canvasDimensions.height;
-farCanvas.width = canvasDimensions.width;
-farCanvas.height = canvasDimensions.height;
+referenceCanvas.width = canvasDimensions.width * 2;
+referenceCanvas.height = canvasDimensions.height * 2;
+farCanvas.width = canvasDimensions.width * 2;
+farCanvas.height = canvasDimensions.height * 2;
 
 const scale = canvasDimensions.width / image.width;
-const focus = -100; // 500000000 // breaks down in vanilla canvas
+const focus = -0; // 500000000 // breaks down in vanilla canvas
 const rotation = {
   x: image.width / 2,
+  // y: focus + image.height / 2,
   y: focus,
   angle: Math.PI,
+  // angle: 0,
 };
 
-const diff = -image.height * 1;
+const diff = -image.height * 3;
 
 const mkImage = ({ x, y, image }) => ({
   x,
@@ -47,27 +52,27 @@ const mkImage = ({ x, y, image }) => ({
 });
 
 const images = [
-  mkImage({ x: 0, y: focus - 2 * image.height, image }),
-  mkImage({ x: 0, y: focus - 1 * image.height, image }),
+  // mkImage({ x: 0, y: focus - 2 * image.height, image }),
+  // mkImage({ x: 0, y: focus - 1 * image.height, image }),
   mkImage({ x: 0, y: focus + 0 * image.height, image }),
-  mkImage({ x: 0, y: focus + 1 * image.height, image }),
+  // mkImage({ x: 0, y: focus + 1 * image.height, image }),
   mkImage({ x: 0, y: focus + 2 * image.height, image }),
-  mkImage({ x: 0, y: focus + 3 * image.height, image }),
-  mkImage({ x: 0, y: focus + 4 * image.height, image }),
+  // mkImage({ x: 0, y: focus + 3 * image.height, image }),
+  // mkImage({ x: 0, y: focus + 4 * image.height, image }),
 ];
 
 const rectangles = [
   { x: 10, y: focus - 200, width: 200, height: 30 },
-  { x: 10, y: focus + 20, width: 200, height: 30 },
-  { x: 100, y: focus + 250, width: 200, height: 30 },
-  { x: -10, y: focus - 10, width: 200, height: 30 },
-  { x: 100, y: focus + 400, width: 200, height: 30 },
-  {
-    x: 0,
-    y: focus + 2 * image.height,
-    width: image.width,
-    height: image.height,
-  },
+  // { x: 10, y: focus + 20, width: 200, height: 30 },
+  // { x: 100, y: focus + 250, width: 200, height: 30 },
+  // { x: -10, y: focus - 10, width: 200, height: 30 },
+  // { x: 100, y: focus + 400, width: 200, height: 30 },
+  // {
+  //   x: 0,
+  //   y: focus + 2 * image.height,
+  //   width: image.width,
+  //   height: image.height,
+  // },
 ];
 
 const contextReference = getReferenceContext2d(

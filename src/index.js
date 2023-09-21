@@ -31,11 +31,21 @@ const getFarContext2d = (
   const d = { x, y, scale, rotation };
   const _context = canvas.getContext("2d");
 
+  // _context.translate(rotation.x, rotation.y);
+  // _context.scale(-1, -1);
+  // _context.translate(-rotation.x, -rotation.y);
+
   const s = {
     x: (x) =>
-      d.rotation.flip * (d.scale * (x + d.x) + d.rotation.x) - d.rotation.x,
+      // d.rotation.flip * (d.scale * (x + d.x) + d.rotation.x) - d.rotation.x,
+      d.rotation.flip * d.scale * (x + d.x) +
+      (d.rotation.flip == 1 ? 0 : 320 * d.scale),
+    // d.scale * (x + d.x),
     y: (y) =>
-      d.rotation.flip * (d.scale * (y + d.y) + d.rotation.y) - d.rotation.y,
+      // d.rotation.flip * (d.scale * (y + d.y) + d.rotation.y) - d.rotation.y,
+      d.rotation.flip * d.scale * (y + d.y) +
+      (d.rotation.flip == 1 ? 0 : 164 * d.scale * 2),
+    // d.scale * (y + d.y),
     distance: (distance) => distance * d.scale,
     inv: {
       x: (x) => x / d.scale - d.x,
@@ -226,8 +236,8 @@ const getFarContext2d = (
         s.x(x),
         s.y(y),
         s.distance(radius),
-        startAngle,
-        endAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + endAngle,
         counterclockwise
       );
     },
@@ -263,8 +273,8 @@ const getFarContext2d = (
       return _context.clearRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     clip(...args) {
@@ -282,7 +292,11 @@ const getFarContext2d = (
       return _context.closePath();
     },
     createConicGradient(startAngle, x, y) {
-      return _context.createConicGradient(startAngle, s.x(x), s.y(y));
+      return _context.createConicGradient(
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        s.x(x),
+        s.y(y)
+      );
     },
     createImageData(...args) {
       if (args.length === 1) {
@@ -322,6 +336,10 @@ const getFarContext2d = (
         s.distance(image.height) / 2
       );
       _context.rotate(d.rotation.angle);
+      _context.translate(
+        -s.distance(image.width) / 2,
+        -s.distance(image.height) / 2
+      );
 
       let value;
       if (args.length === 2) {
@@ -330,8 +348,8 @@ const getFarContext2d = (
           image,
           s.x(dx),
           s.y(dy),
-          s.distance(image.width),
-          s.distance(image.height)
+          d.rotation.flip * s.distance(image.width),
+          d.rotation.flip * s.distance(image.height)
         );
       } else if (args.length === 4) {
         const [dx, dy, dWidth, dHeight] = args;
@@ -339,8 +357,8 @@ const getFarContext2d = (
           image,
           s.x(dx),
           s.y(dy),
-          s.distance(dWidth),
-          s.distance(dHeight)
+          d.rotation.flip * s.distance(dWidth),
+          d.rotation.flip * s.distance(dHeight)
         );
       } else if (args.length === 8) {
         // NOTE see getImageData
@@ -367,8 +385,8 @@ const getFarContext2d = (
         s.distance(radiusX),
         s.distance(radiusY),
         rotation,
-        startAngle,
-        endAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + endAngle,
         counterclockwise
       );
     },
@@ -387,17 +405,20 @@ const getFarContext2d = (
       return _context.fillRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     fillText(text, x, y, maxWidth = undefined) {
-      return _context.fillText(
+      _context.save();
+      const value = _context.fillText(
         text,
         s.x(x),
         s.y(y),
         isDefined(maxWidth) ? s.distance(maxWidth) : undefined
       );
+      _context.restore();
+      return value;
     },
     getContextAttributes() {
       return _context.getContextAttributes();
@@ -441,8 +462,8 @@ const getFarContext2d = (
       return _context.rect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     resetTransform() {
@@ -458,8 +479,8 @@ const getFarContext2d = (
       return _context.roundRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height),
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height),
         s.distance(radii)
       );
     },
@@ -482,17 +503,45 @@ const getFarContext2d = (
       return _context.strokeRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     strokeText(text, x, y, maxWidth = undefined) {
-      return _context.strokeText(
+      _context.save();
+      const measure = _context.measureText(text);
+      const fontHeight =
+        measure.fontBoundingBoxAscent + measure.fontBoundingBoxDescent;
+      const actualHeight =
+        measure.actualBoundingBoxAscent + measure.actualBoundingBoxDescent;
+      console.log(measure.width, fontHeight, actualHeight);
+      _context.translate(
+        s.distance(measure.width) / 2,
+        s.distance(actualHeight) / 2
+      );
+      _context.rotate(d.rotation.angle);
+      _context.translate(
+        -s.distance(measure.width) / 2,
+        -s.distance(actualHeight) / 2
+      );
+      console.log(x, y, s.x(x), s.y(y));
+      _context.fillRect(
+        // s.x(x),
+        // s.y(y),
+        x,
+        y,
+        -s.distance(measure.width),
+        -s.distance(actualHeight)
+      );
+
+      const value = _context.strokeText(
         text,
         s.x(x),
         s.y(y),
         isDefined(maxWidth) ? s.distance(maxWidth) : undefined
       );
+      _context.restore();
+      return value;
     },
     transform(a, b, c, d, e, f) {
       notSupported("transform");
