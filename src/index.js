@@ -1,12 +1,51 @@
 const isDefined = (o) => ![null, undefined].includes(o);
 
-const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
-  const d = { x, y, scale };
+/* FIXME rotation pi
+/ * coordinatesystem
+/ * image
+/ * font
+/ * shadow
+/
+/
+*/
+
+const getFarContext2d = (
+  canvas,
+  { x = 0, y = 0, scale = 1, rotation = { x: 0, y: 0, angle: 0 } } = {}
+) => {
+  const notSupported = (name) => {
+    throw new Error(`${name} not supported`);
+  };
+  const notImplementedYet = (name) => {
+    throw new Error(`${name} not implemented yet`);
+  };
+
+  if (rotation.angle === 0) {
+    rotation.flip = 1;
+  } else if (rotation.angle === Math.PI || rotation.angle === -Math.PI) {
+    rotation.flip = -1;
+  } else {
+    notSupported("rotation.angle not [-PI, 0, PI]");
+  }
+
+  const d = { x, y, scale, rotation };
   const _context = canvas.getContext("2d");
 
+  // _context.translate(rotation.x, rotation.y);
+  // _context.scale(-1, -1);
+  // _context.translate(-rotation.x, -rotation.y);
+
   const s = {
-    x: (x) => d.scale * (x + d.x),
-    y: (y) => d.scale * (y + d.y),
+    x: (x) =>
+      // d.rotation.flip * (d.scale * (x + d.x) + d.rotation.x) - d.rotation.x,
+      d.rotation.flip * d.scale * (x + d.x) +
+      (d.rotation.flip == 1 ? 0 : 320 * d.scale),
+    // d.scale * (x + d.x),
+    y: (y) =>
+      // d.rotation.flip * (d.scale * (y + d.y) + d.rotation.y) - d.rotation.y,
+      d.rotation.flip * d.scale * (y + d.y) +
+      (d.rotation.flip == 1 ? 0 : 164 * d.scale * 2),
+    // d.scale * (y + d.y),
     distance: (distance) => distance * d.scale,
     inv: {
       x: (x) => x / d.scale - d.x,
@@ -24,13 +63,6 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
 
   _context.lineWidth = s.distance(_context.lineWidth);
   _context.font = `${s.distance(10)}px sans-serif`;
-
-  const notSupported = (name) => {
-    throw new Error(`${name} not supported`);
-  };
-  const notImplementedYet = (name) => {
-    throw new Error(`${name} not implemented yet`);
-  };
 
   /* TODO
     - measureText
@@ -199,13 +231,14 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
     set textBaseline(textBaseline) {
       _context.textBaseline = textBaseline;
     },
-    arc(x, y, radius, startAngle, endAngle, counterclockwise) {
+    arc(x, y, radius, startAngle, endAngle, counterclockwise = false) {
       return _context.arc(
         s.x(x),
         s.y(y),
         s.distance(radius),
-        startAngle,
-        endAngle
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + endAngle,
+        counterclockwise
       );
     },
     arcTo(x1, y1, x2, y2, radius) {
@@ -240,8 +273,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.clearRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     clip(...args) {
@@ -259,7 +292,11 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.closePath();
     },
     createConicGradient(startAngle, x, y) {
-      return _context.createConicGradient(startAngle, s.x(x), s.y(y));
+      return _context.createConicGradient(
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        s.x(x),
+        s.y(y)
+      );
     },
     createImageData(...args) {
       if (args.length === 1) {
@@ -293,29 +330,44 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       notImplementedYet("drawFocusIfNeeded");
     },
     drawImage(image, ...args) {
+      _context.save();
+      _context.translate(
+        s.distance(image.width) / 2,
+        s.distance(image.height) / 2
+      );
+      _context.rotate(d.rotation.angle);
+      _context.translate(
+        -s.distance(image.width) / 2,
+        -s.distance(image.height) / 2
+      );
+
+      let value;
       if (args.length === 2) {
         const [dx, dy] = args;
-        return _context.drawImage(
+        value = _context.drawImage(
           image,
           s.x(dx),
           s.y(dy),
-          s.distance(image.width),
-          s.distance(image.height)
+          d.rotation.flip * s.distance(image.width),
+          d.rotation.flip * s.distance(image.height)
         );
       } else if (args.length === 4) {
         const [dx, dy, dWidth, dHeight] = args;
-        return _context.drawImage(
+        value = _context.drawImage(
           image,
           s.x(dx),
           s.y(dy),
-          s.distance(dWidth),
-          s.distance(dHeight)
+          d.rotation.flip * s.distance(dWidth),
+          d.rotation.flip * s.distance(dHeight)
         );
       } else if (args.length === 8) {
         // NOTE see getImageData
         const [sx, sy, sWidth, sHeight, dx, dy] = args;
         notImplementedYet("drawImage(sx, sy, sWidth, sHeight, dx, dy)");
       }
+      _context.restore();
+
+      return value;
     },
     ellipse(
       x,
@@ -333,8 +385,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
         s.distance(radiusX),
         s.distance(radiusY),
         rotation,
-        startAngle,
-        endAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + startAngle,
+        ((d.rotation.flip - 1) / 2) * Math.PI + endAngle,
         counterclockwise
       );
     },
@@ -353,17 +405,20 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.fillRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     fillText(text, x, y, maxWidth = undefined) {
-      return _context.fillText(
+      _context.save();
+      const value = _context.fillText(
         text,
         s.x(x),
         s.y(y),
         isDefined(maxWidth) ? s.distance(maxWidth) : undefined
       );
+      _context.restore();
+      return value;
     },
     getContextAttributes() {
       return _context.getContextAttributes();
@@ -407,8 +462,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.rect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     resetTransform() {
@@ -424,8 +479,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.roundRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height),
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height),
         s.distance(radii)
       );
     },
@@ -448,17 +503,45 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.strokeRect(
         s.x(x),
         s.y(y),
-        s.distance(width),
-        s.distance(height)
+        d.rotation.flip * s.distance(width),
+        d.rotation.flip * s.distance(height)
       );
     },
     strokeText(text, x, y, maxWidth = undefined) {
-      return _context.strokeText(
+      _context.save();
+      const measure = _context.measureText(text);
+      const fontHeight =
+        measure.fontBoundingBoxAscent + measure.fontBoundingBoxDescent;
+      const actualHeight =
+        measure.actualBoundingBoxAscent + measure.actualBoundingBoxDescent;
+      console.log(measure.width, fontHeight, actualHeight);
+      _context.translate(
+        s.distance(measure.width) / 2,
+        s.distance(actualHeight) / 2
+      );
+      _context.rotate(d.rotation.angle);
+      _context.translate(
+        -s.distance(measure.width) / 2,
+        -s.distance(actualHeight) / 2
+      );
+      console.log(x, y, s.x(x), s.y(y));
+      _context.fillRect(
+        // s.x(x),
+        // s.y(y),
+        x,
+        y,
+        -s.distance(measure.width),
+        -s.distance(actualHeight)
+      );
+
+      const value = _context.strokeText(
         text,
         s.x(x),
         s.y(y),
         isDefined(maxWidth) ? s.distance(maxWidth) : undefined
       );
+      _context.restore();
+      return value;
     },
     transform(a, b, c, d, e, f) {
       notSupported("transform");
@@ -471,10 +554,13 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
   };
 };
 
-export const far = (canvas, { x = 0, y = 0, scale = 1 } = {}) => ({
+export const far = (
+  canvas,
+  { x = 0, y = 0, scale = 1, rotation = { x: 0, y: 0, rotation: 0 } } = {}
+) => ({
   getContext: (contextType, contextAttribute) => {
     if (contextType == "2d" && !isDefined(contextAttribute)) {
-      return getFarContext2d(canvas, { x, y, scale });
+      return getFarContext2d(canvas, { x, y, scale, rotation });
     } else {
       throw new Error('getContext(contextType != "2d") not implemented');
     }
