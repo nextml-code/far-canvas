@@ -1,17 +1,67 @@
 const isDefined = (o) => ![null, undefined].includes(o);
 
-const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
-  const d = { x, y, scale };
+const getFarContext2d = (
+  canvas,
+  { x = 0, y = 0, scale = 1, rotation = { x: 0, y: 0, angle: 0 } } = {}
+) => {
+  if (![0, Math.PI].includes(rotation.angle)) {
+    throw new Error("Only 0 and PI rotation angles are supported");
+  }
+
   const _context = canvas.getContext("2d");
 
+  const d = { x, y: y * Math.cos(rotation.angle), scale, rotation };
+
   const s = {
-    x: (x) => d.scale * (x + d.x),
-    y: (y) => d.scale * (y + d.y),
-    distance: (distance) => distance * d.scale,
+    x: (x) => {
+      // First, translate, then rotate
+      const translatedX = x + d.x;
+      const translatedY = d.y; // y-coordinate remains the same for calculating x
+      // Apply rotation
+      const rotatedX =
+        Math.cos(d.rotation.angle) * (translatedX - d.rotation.x) -
+        Math.sin(d.rotation.angle) * (translatedY - d.rotation.y) +
+        d.rotation.x;
+      // Finally, apply scaling
+      return d.scale * rotatedX;
+    },
+    y: (y) => {
+      // First, translate, then rotate
+      const translatedX = d.x; // x-coordinate remains the same for calculating y
+      const translatedY = y + d.y;
+      // Apply rotation
+      const rotatedY =
+        Math.sin(d.rotation.angle) * (translatedX - d.rotation.x) +
+        Math.cos(d.rotation.angle) * (translatedY - d.rotation.y) +
+        d.rotation.y;
+      // Finally, apply scaling
+      return d.scale * rotatedY;
+    },
+    distance: (distance) => distance * d.scale, // Scale distances
     inv: {
-      x: (x) => x / d.scale - d.x,
-      y: (y) => y / d.scale - d.y,
-      distance: (distance) => distance / d.scale,
+      x: (x) => {
+        // First, undo scaling
+        let unscaledX = x / d.scale;
+        // Then, undo rotation
+        const rotatedX =
+          Math.cos(-d.rotation.angle) * (unscaledX - d.rotation.x) -
+          Math.sin(-d.rotation.angle) * -d.rotation.y +
+          d.rotation.x;
+        // Finally, undo translation
+        return rotatedX - d.x;
+      },
+      y: (y) => {
+        // First, undo scaling
+        let unscaledY = y / d.scale;
+        // Then, undo rotation
+        const rotatedY =
+          Math.sin(-d.rotation.angle) * -d.rotation.x +
+          Math.cos(-d.rotation.angle) * (unscaledY - d.rotation.y) +
+          d.rotation.y;
+        // Finally, undo translation
+        return rotatedY - d.y;
+      },
+      distance: (distance) => distance / d.scale, // Undo scaling for distances
     },
   };
 
@@ -295,25 +345,40 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
     drawImage(image, ...args) {
       if (args.length === 2) {
         const [dx, dy] = args;
-        return _context.drawImage(
+
+        // Save the current context state
+        _context.save();
+
+        // Move to where the image will be drawn and apply rotation
+        _context.translate(s.x(dx), s.y(dy));
+        _context.rotate(d.rotation.angle);
+
+        // Draw the image with its top-left corner at the origin
+        _context.drawImage(
           image,
-          s.x(dx),
-          s.y(dy),
+          0,
+          0,
           s.distance(image.width),
           s.distance(image.height)
         );
+
+        // Restore the context to its original state
+        _context.restore();
       } else if (args.length === 4) {
         const [dx, dy, dWidth, dHeight] = args;
-        return _context.drawImage(
+        // Similar steps as above, adapted for specified width and height
+        _context.save();
+        _context.translate(s.x(dx), s.y(dy));
+        _context.rotate(d.rotation.angle);
+        _context.drawImage(
           image,
-          s.x(dx),
-          s.y(dy),
+          0,
+          0,
           s.distance(dWidth),
           s.distance(dHeight)
         );
+        _context.restore();
       } else if (args.length === 8) {
-        // NOTE see getImageData
-        const [sx, sy, sWidth, sHeight, dx, dy] = args;
         notImplementedYet("drawImage(sx, sy, sWidth, sHeight, dx, dy)");
       }
     },
@@ -350,20 +415,46 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       }
     },
     fillRect(x, y, width, height) {
-      return _context.fillRect(
-        s.x(x),
-        s.y(y),
-        s.distance(width),
-        s.distance(height)
-      );
+      // Save the current context state
+      _context.save();
+
+      // Calculate the center of the rectangle
+      let centerX = x + width / 2;
+      let centerY = y + height / 2;
+
+      // Move to the center of the rectangle
+      _context.translate(s.x(centerX), s.y(centerY));
+
+      // Rotate the context
+      _context.rotate(d.rotation.angle);
+
+      // Move back from the center to the top-left corner of the rectangle
+      _context.translate(-s.distance(width) / 2, -s.distance(height) / 2);
+
+      // Draw the rectangle
+      _context.fillRect(0, 0, s.distance(width), s.distance(height));
+
+      // Restore the context to its original state
+      _context.restore();
     },
     fillText(text, x, y, maxWidth = undefined) {
-      return _context.fillText(
+      // Save the current context state
+      _context.save();
+
+      // Apply translation and rotation
+      _context.translate(s.x(x), s.y(y));
+      _context.rotate(d.rotation.angle);
+
+      // Render the text
+      _context.fillText(
         text,
-        s.x(x),
-        s.y(y),
+        0,
+        0,
         isDefined(maxWidth) ? s.distance(maxWidth) : undefined
       );
+
+      // Restore the context to its original state
+      _context.restore();
     },
     getContextAttributes() {
       return _context.getContextAttributes();
@@ -404,12 +495,29 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       return _context.quadraticCurveTo(s.x(cpx), s.y(cpy), s.x(x), s.y(y));
     },
     rect(x, y, width, height) {
-      return _context.rect(
-        s.x(x),
-        s.y(y),
-        s.distance(width),
-        s.distance(height)
-      );
+      // Save the current context state
+      _context.save();
+
+      // Calculate the center of the rectangle
+      let centerX = x + width / 2;
+      let centerY = y + height / 2;
+
+      // Move to the center of the rectangle
+      _context.translate(s.x(centerX), s.y(centerY));
+
+      // Rotate the context
+      _context.rotate(d.rotation.angle);
+
+      // Move back from the center to the top-left corner of the rectangle
+      _context.translate(-s.distance(width) / 2, -s.distance(height) / 2);
+
+      // Create the rectangle path
+      _context.beginPath();
+      _context.rect(0, 0, s.distance(width), s.distance(height));
+      _context.closePath();
+
+      // Restore the context to its original state
+      _context.restore();
     },
     resetTransform() {
       notSupported("resetTransform");
@@ -453,12 +561,25 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       );
     },
     strokeText(text, x, y, maxWidth = undefined) {
-      return _context.strokeText(
+      // Save the current context state
+      _context.save();
+
+      // Translate to the baseline starting point of the text
+      _context.translate(s.x(x), s.y(y));
+
+      // Rotate the context
+      _context.rotate(d.rotation.angle);
+
+      // Draw the text
+      _context.strokeText(
         text,
-        s.x(x),
-        s.y(y),
-        isDefined(maxWidth) ? s.distance(maxWidth) : undefined
+        0,
+        0,
+        maxWidth !== undefined ? s.distance(maxWidth) : undefined
       );
+
+      // Restore the context to its original state
+      _context.restore();
     },
     transform(a, b, c, d, e, f) {
       notSupported("transform");
@@ -471,10 +592,13 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
   };
 };
 
-export const far = (canvas, { x = 0, y = 0, scale = 1 } = {}) => ({
+export const far = (
+  canvas,
+  { x = 0, y = 0, scale = 1, rotation = { x: 0, y: 0, angle: 0 } } = {}
+) => ({
   getContext: (contextType, contextAttribute) => {
     if (contextType == "2d" && !isDefined(contextAttribute)) {
-      return getFarContext2d(canvas, { x, y, scale });
+      return getFarContext2d(canvas, { x, y, scale, rotation });
     } else {
       throw new Error('getContext(contextType != "2d") not implemented');
     }
