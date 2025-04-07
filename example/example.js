@@ -1,3 +1,5 @@
+import { far } from "../src/index.js";
+
 function getReferenceContext2d(element, transform) {
   const context = element.getContext("2d");
   context.scale(transform.scale, transform.scale);
@@ -7,9 +9,7 @@ function getReferenceContext2d(element, transform) {
 }
 
 function getFarContext2d(element, transform) {
-  const context = far.far(element, transform).getContext("2d");
-
-  return context;
+  return far(element, transform).getContext("2d");
 }
 
 const referenceCanvas = document.getElementById("reference");

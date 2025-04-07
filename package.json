@@ -1,40 +1,24 @@
 {
-  "name": "@nextml/far-canvas",
+  "name": "far-canvas",
   "version": "0.3.4",
-  "description": "Fixes web html5 canvas for big translations (100Mpx)",
-  "main": "lib.cjs/index.js",
-  "directories": {
-    "test": "test"
-  },
+  "description": "Canvas wrapper for handling large coordinate values",
+  "main": "src/index.js",
+  "type": "module",
   "scripts": {
-    "dist": "npm run dist::cjs && npm run dist::web",
-    "dist::cjs": "rollup src/index.js --file lib.cjs/index.js --format cjs",
-    "dist::web": "rollup src/index.js --file lib.web/index.js --format iife --name far",
-    "pretest": "npm run dist::cjs",
-    "test": "jest --verbose",
-    "preexample": "npm run dist::web",
-    "example": "live-server --open=example ."
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nextml-code/far-canvas.git"
+    "example": "vite example",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "canvas",
-    "translation",
-    "fix",
-    "html5"
+    "coordinates",
+    "overflow"
   ],
-  "author": "nextml",
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/nextml-code/far-canvas/issues"
-  },
-  "homepage": "https://github.com/nextml-code/far-canvas#readme",
+  "author": "",
+  "license": "ISC",
   "devDependencies": {
-    "jest": "^29.2.1",
-    "live-server": "^1.2.2",
-    "prettier": "^2.7.1",
-    "rollup": "^3.2.3"
+    "vite": "^4.5.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
