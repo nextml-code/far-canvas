@@ -1,15 +1,21 @@
+import { far } from "../src/index.js";
+
 function getReferenceContext2d(element, transform) {
   const context = element.getContext("2d");
+  // Reset transform first
+  context.resetTransform();
+  // Then apply in same order: scale, rotate, translate
   context.scale(transform.scale, transform.scale);
+  if (transform.rotation) {
+    context.rotate(transform.rotation);
+  }
   context.translate(transform.x, transform.y);
 
   return context;
 }
 
 function getFarContext2d(element, transform) {
-  const context = far.far(element, transform).getContext("2d");
-
-  return context;
+  return far(element, transform).getContext("2d");
 }
 
 const referenceCanvas = document.getElementById("reference");
@@ -70,6 +76,12 @@ const contextFar = getFarContext2d(document.getElementById("far"), {
 
 image.data.onload = function () {
   function render(ctx) {
+    // Clear the canvas first
+    ctx.save();
+    ctx.resetTransform();
+    ctx.clearRect(0, 0, canvasDimensions.width, canvasDimensions.height);
+    ctx.restore();
+
     images.forEach((image, i) => {
       ctx.save();
 
@@ -123,10 +135,80 @@ image.data.onload = function () {
 
       ctx.restore();
     });
+    // Draw transform tests last (at the top of canvas)
+    testTransforms(ctx);
   }
 
+  // Run rendering
   render(contextReference);
   render(contextFar);
 };
 image.data.src =
   "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Saturn_from_Cassini_Orbiter_%282004-10-06%29.jpg/320px-Saturn_from_Cassini_Orbiter_%282004-10-06%29.jpg";
+
+// Test transform operations
+function testTransforms(ctx) {
+  // Save current state before switching to screen space
+  ctx.save();
+  ctx.resetTransform();
+
+  // Clear the test area
+  ctx.fillStyle = "#EEE";
+  ctx.fillRect(0, 0, 400, 200);
+
+  // Draw a grid for reference
+  ctx.strokeStyle = "#CCC";
+  for (let x = 0; x <= 400; x += 50) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 200);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= 200; y += 50) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(400, y);
+    ctx.stroke();
+  }
+
+  // Draw labels
+  ctx.fillStyle = "#000";
+  ctx.font = "12px sans-serif";
+  ctx.fillText("1. Blue: translate(50,50)", 10, 15);
+  ctx.fillText("2. Green: scale(2,2)", 10, 30);
+  ctx.fillText("3. Red: rotate(45°)", 10, 45);
+  ctx.fillText("4. Yellow: setTransform(skew)", 10, 60);
+
+  // Test 1: Basic translation
+  ctx.save();
+  ctx.translate(50, 50);
+  ctx.fillStyle = "#00F";
+  ctx.fillRect(0, 0, 30, 30);
+  ctx.restore();
+
+  // Test 2: Scale
+  ctx.save();
+  ctx.translate(100, 50);
+  ctx.scale(2, 2);
+  ctx.fillStyle = "#0F0";
+  ctx.fillRect(-15, -15, 15, 15);
+  ctx.restore();
+
+  // Test 3: Rotation
+  ctx.save();
+  ctx.translate(150, 50);
+  ctx.rotate(Math.PI / 4); // 45 degrees
+  ctx.fillStyle = "#F00";
+  ctx.fillRect(-10, -10, 20, 20);
+  ctx.restore();
+
+  // Test 4: setTransform (absolute)
+  ctx.save();
+  ctx.setTransform(1, 0.2, 0.2, 1, 250, 75);
+  ctx.fillStyle = "#FF0";
+  ctx.fillRect(0, 0, 30, 30);
+  ctx.restore();
+
+  // Restore original state (back to world space)
+  ctx.restore();
+}
