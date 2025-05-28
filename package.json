@@ -32,6 +32,7 @@
   },
   "homepage": "https://github.com/nextml-code/far-canvas#readme",
   "devDependencies": {
+    "canvas": "^3.1.0",
     "jest": "^29.2.1",
     "live-server": "^1.2.2",
     "prettier": "^2.7.1",
