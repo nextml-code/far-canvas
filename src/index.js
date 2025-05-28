@@ -60,10 +60,10 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
       _context.fillStyle = style;
     },
     get filter() {
-      notImplementedYet("filter");
+      return _context.filter;
     },
     set filter(filter) {
-      notImplementedYet("filter");
+      _context.filter = filter;
     },
     get font() {
       const font_ = _context.font.split(" ").filter((a) => a.trim());
@@ -314,8 +314,18 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
         );
       } else if (args.length === 8) {
         // NOTE see getImageData
-        const [sx, sy, sWidth, sHeight, dx, dy] = args;
-        notImplementedYet("drawImage(sx, sy, sWidth, sHeight, dx, dy)");
+        const [sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight] = args;
+        return _context.drawImage(
+          image,
+          sx,
+          sy,
+          sWidth,
+          sHeight,
+          s.x(dx),
+          s.y(dy),
+          s.distance(dWidth),
+          s.distance(dHeight)
+        );
       }
     },
     ellipse(
