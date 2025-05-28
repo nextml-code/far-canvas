@@ -653,25 +653,6 @@ test.each([
   }
 );
 
-// Special test for filter property that throws on getter
-test("throws not implemented for filter property", () => {
-  const mockContext = {
-    get lineWidth() {
-      return 1;
-    },
-    set lineWidth(v) {},
-  };
-
-  const context = far(
-    { getContext: jest.fn().mockReturnValue(mockContext) },
-    {}
-  ).getContext("2d");
-
-  // Filter throws on getter access
-  expect(() => context.filter).toThrow("not implemented yet");
-  expect(() => (context.filter = "blur(5px)")).toThrow("not implemented yet");
-});
-
 // Additional property tests
 test.each([
   ["miterLimit", 10, { scale: 2 }, 20],
@@ -909,4 +890,36 @@ test("font getter inverse transforms correctly", () => {
   context.font = "16px serif";
   expect(storedFont).toBe(" 32px serif");
   expect(context.font).toBe(" 16px serif");
+});
+
+// Test filter property
+test("filter property is passed through", () => {
+  let storedFilter = "none";
+  const mockContext = {
+    get lineWidth() {
+      return 1;
+    },
+    set lineWidth(v) {},
+    get filter() {
+      return storedFilter;
+    },
+    set filter(f) {
+      storedFilter = f;
+    },
+  };
+
+  const context = far(
+    { getContext: jest.fn().mockReturnValue(mockContext) },
+    { scale: 2 }
+  ).getContext("2d");
+
+  // Test setting filter
+  context.filter = "blur(5px)";
+  expect(storedFilter).toBe("blur(5px)");
+  expect(context.filter).toBe("blur(5px)");
+
+  // Test various filter values
+  context.filter = "contrast(150%) brightness(120%)";
+  expect(storedFilter).toBe("contrast(150%) brightness(120%)");
+  expect(context.filter).toBe("contrast(150%) brightness(120%)");
 });
