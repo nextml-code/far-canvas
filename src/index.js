@@ -74,14 +74,21 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
 
 // Transform-Aware implementation (new approach)
 const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
-  // The offset transform that moves far coordinates to near origin
-  // When drawing at world coordinates (wx, wy), we want it to appear at screen (scale * (wx - x), scale * (wy - y))
-  // This way drawing at (x + 50, y + 50) appears at screen (50, 50)
-  // In matrix form, this is: translate by (-x, -y), then scale
-  const offsetTransform = multiplyMatrices(
-    scaleMatrix(scale, scale),
-    translateMatrix(-x, -y)
-  );
+  // CRITICAL FIX: Don't pass large coordinates to setTransform!
+  // Instead, use coordinate transformation for the far-canvas offset
+  // and native transforms only for user transforms.
+
+  // Far-canvas coordinate transformation (like the fallback implementation)
+  const farTransform = {
+    x: (worldX) => scale * (worldX - x),
+    y: (worldY) => scale * (worldY - y),
+    distance: (distance) => distance * scale,
+    inv: {
+      x: (screenX) => screenX / scale + x,
+      y: (screenY) => screenY / scale + y,
+      distance: (distance) => distance / scale,
+    },
+  };
 
   // Stack of transform states for save/restore
   const transformStack = [];
@@ -89,46 +96,28 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
   // Current user transform (starts as identity)
   let userTransform = createMatrix();
 
-  // Combined transform = offset * user
-  let combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-
-  // Apply the combined transform to the canvas
-  const applyTransform = () => {
-    const m = combinedTransform;
+  // Apply only the user transform to the canvas (no large translations!)
+  const applyUserTransform = () => {
+    const m = userTransform;
     _context.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
   };
 
-  // Initialize with our transform
-  applyTransform();
-
-  // Helper to transform distances (for line widths, etc.)
-  const transformDistance = (distance) => {
-    // Just use the scale factor, not the full transform
-    return distance * scale;
-  };
-
-  // Helper to get inverse transform for measurements
-  const getInverseTransformDistance = (distance) => {
-    return distance / scale;
-  };
+  // Initialize with identity transform (no large coordinates passed to setTransform)
+  applyUserTransform();
 
   // Canvas dimensions in user coordinates
   const getCanvasDimensions = () => {
-    const inv = invertMatrix(combinedTransform);
-    const topLeft = transformPoint(inv, 0, 0);
-    const bottomRight = transformPoint(inv, canvas.width, canvas.height);
     return {
-      x: topLeft.x,
-      y: topLeft.y,
-      width: bottomRight.x - topLeft.x,
-      height: bottomRight.y - topLeft.y,
+      x: farTransform.inv.x(0),
+      y: farTransform.inv.y(0),
+      width: farTransform.inv.distance(canvas.width),
+      height: farTransform.inv.distance(canvas.height),
     };
   };
 
-  // Initialize line width and font. These are set to their world values.
-  // The main `offsetTransform` (applied via `_context.setTransform`) will handle visual scaling.
-  _context.lineWidth = 1; // Default world line width
-  _context.font = "10px sans-serif"; // Default world font
+  // Initialize line width and font with far-canvas scaling
+  _context.lineWidth = farTransform.distance(1); // 1 world unit = scale screen pixels
+  _context.font = `${farTransform.distance(10)}px sans-serif`; // 10 world units
 
   // https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
   return {
@@ -157,27 +146,39 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       _context.filter = filter;
     },
     get font() {
-      // Get the font string from the underlying context (which should be unscaled if our setter is correct)
+      // Return the font in world coordinates
       const actualFont = _context.font;
       const fontParts = actualFont.split(" ").filter((a) => a.trim());
 
       if (![2, 3].includes(fontParts.length)) {
-        return actualFont; // Return as-is if we can't parse
+        return actualFont;
       }
-      // We don't need to inversely scale here if the setter stores the unscaled value.
-      // The user expects to get back what they set, in their coordinate space.
-      return actualFont.trim();
+
+      // Convert screen font size back to world coordinates
+      const screenSize = parseFloat(fontParts[0]);
+      const worldSize = farTransform.inv.distance(screenSize);
+      return `${worldSize}px ${fontParts.slice(1).join(" ")}`;
     },
     set font(font) {
       const font_ = font.split(" ").filter((a) => a.trim());
 
       if (![2, 3].includes(font_.length)) {
-        _context.font = font; // Set as-is if we can't parse
+        _context.font = font;
       } else {
-        // When transforms are supported, set the font size as is to the underlying context.
-        // The main canvas transform (setTransform) will scale the text rendering.
-        // Storing a scaled font size and then having setTransform also scale leads to double scaling.
-        _context.font = font.trim(); // Directly set the user's font string
+        // Find the size part (ends with 'px')
+        const sizeIndex = font_.findIndex((part) => part.endsWith("px"));
+        if (sizeIndex === -1) {
+          _context.font = font;
+        } else {
+          // Convert world font size to screen coordinates
+          const worldSize = parseFloat(font_[sizeIndex]);
+          const screenSize = farTransform.distance(worldSize);
+
+          // Reconstruct font string with scaled size
+          const fontParts = [...font_];
+          fontParts[sizeIndex] = `${screenSize}px`;
+          _context.font = fontParts.join(" ");
+        }
       }
     },
     get fontKerning() {
@@ -217,10 +218,10 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       _context.lineCap = lineCap;
     },
     get lineDashOffset() {
-      return _context.lineDashOffset / scale;
+      return farTransform.inv.distance(_context.lineDashOffset);
     },
     set lineDashOffset(lineDashOffset) {
-      _context.lineDashOffset = lineDashOffset;
+      _context.lineDashOffset = farTransform.distance(lineDashOffset);
     },
     get lineJoin() {
       return _context.lineJoin;
@@ -229,26 +230,22 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       _context.lineJoin = lineJoin;
     },
     get lineWidth() {
-      // If transforms are supported and scale is part of offsetTransform,
-      // _context.lineWidth is already scaled. We need to return the unscaled value.
-      return _context.lineWidth / scale;
+      return farTransform.inv.distance(_context.lineWidth);
     },
     set lineWidth(width) {
-      // When transforms are supported, set the lineWidth as is.
-      // The main canvas transform (setTransform) will scale the line rendering.
-      _context.lineWidth = width;
+      _context.lineWidth = farTransform.distance(width);
     },
     get miterLimit() {
-      return _context.miterLimit / scale;
+      return farTransform.inv.distance(_context.miterLimit);
     },
     set miterLimit(miterLimit) {
-      _context.miterLimit = miterLimit;
+      _context.miterLimit = farTransform.distance(miterLimit);
     },
     get shadowBlur() {
-      return _context.shadowBlur;
+      return farTransform.inv.distance(_context.shadowBlur);
     },
     set shadowBlur(shadowBlur) {
-      _context.shadowBlur = shadowBlur;
+      _context.shadowBlur = farTransform.distance(shadowBlur);
     },
     get shadowColor() {
       return _context.shadowColor;
@@ -257,16 +254,16 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       _context.shadowColor = shadowColor;
     },
     get shadowOffsetX() {
-      return _context.shadowOffsetX / scale;
+      return farTransform.inv.distance(_context.shadowOffsetX);
     },
     set shadowOffsetX(shadowOffsetX) {
-      _context.shadowOffsetX = shadowOffsetX;
+      _context.shadowOffsetX = farTransform.distance(shadowOffsetX);
     },
     get shadowOffsetY() {
-      return _context.shadowOffsetY / scale;
+      return farTransform.inv.distance(_context.shadowOffsetY);
     },
     set shadowOffsetY(shadowOffsetY) {
-      _context.shadowOffsetY = shadowOffsetY;
+      _context.shadowOffsetY = farTransform.distance(shadowOffsetY);
     },
     get strokeStyle() {
       return _context.strokeStyle;
@@ -286,18 +283,38 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
     set textBaseline(textBaseline) {
       _context.textBaseline = textBaseline;
     },
-    // Drawing methods - now just pass through since transform handles everything
-    arc(x, y, radius, startAngle, endAngle, counterclockwise) {
-      return _context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
+    // Drawing methods - transform coordinates before passing to canvas
+    arc(worldX, worldY, radius, startAngle, endAngle, counterclockwise) {
+      return _context.arc(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(radius),
+        startAngle,
+        endAngle,
+        counterclockwise
+      );
     },
     arcTo(x1, y1, x2, y2, radius) {
-      return _context.arcTo(x1, y1, x2, y2, radius);
+      return _context.arcTo(
+        farTransform.x(x1),
+        farTransform.y(y1),
+        farTransform.x(x2),
+        farTransform.y(y2),
+        farTransform.distance(radius)
+      );
     },
     beginPath() {
       return _context.beginPath();
     },
     bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y) {
-      return _context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+      return _context.bezierCurveTo(
+        farTransform.x(cp1x),
+        farTransform.y(cp1y),
+        farTransform.x(cp2x),
+        farTransform.y(cp2y),
+        farTransform.x(x),
+        farTransform.y(y)
+      );
     },
     clearCanvas() {
       _context.save();
@@ -305,14 +322,18 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       _context.clearRect(0, 0, _context.canvas.width, _context.canvas.height);
       _context.restore();
     },
-    clearRect(x, y, width, height) {
-      return _context.clearRect(x, y, width, height);
+    clearRect(worldX, worldY, width, height) {
+      return _context.clearRect(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(width),
+        farTransform.distance(height)
+      );
     },
     clip(...args) {
       if (args.length === 0) {
         return _context.clip();
       } else if (typeof args[0] === "object") {
-        // TODO Path2D support
         throw new Error("clip(Path2D, .) not implemented yet");
       } else {
         return _context.clip(...args);
@@ -321,59 +342,84 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
     closePath() {
       return _context.closePath();
     },
-    createConicGradient(startAngle, x, y) {
-      // Gradients are created in user space
-      return _context.createConicGradient(startAngle, x, y);
+    createConicGradient(startAngle, worldX, worldY) {
+      return _context.createConicGradient(
+        startAngle,
+        farTransform.x(worldX),
+        farTransform.y(worldY)
+      );
     },
     createImageData(...args) {
       if (args.length === 1) {
-        // ImageData. Acest obiect nu este scalat.
-        // Ar trebui să verificăm dacă obiectul imagedata este un wrapper?
-        // Sau ar trebui să presupunem că este deja în coordonatele ecranului?
-        // Momentan, vom arunca o eroare pentru a evita comportamentul neașteptat.
-        throw new Error(
-          "createImageData(imagedata) not implemented with scaling considerations yet"
-        );
+        return _context.createImageData(args[0]);
       } else {
         const [width, height, settings] = args;
-        // User provides width/height in world coordinates.
-        // These need to be scaled for the underlying context method.
         return _context.createImageData(
-          width * scale, // Scale here, as _context.createImageData expects screen pixels
-          height * scale,
+          farTransform.distance(width),
+          farTransform.distance(height),
           settings
         );
       }
     },
     createLinearGradient(x0, y0, x1, y1) {
-      // Gradients are created in user space
-      return _context.createLinearGradient(x0, y0, x1, y1);
+      return _context.createLinearGradient(
+        farTransform.x(x0),
+        farTransform.y(y0),
+        farTransform.x(x1),
+        farTransform.y(y1)
+      );
     },
     createPattern(image, repetition) {
       throw new Error("createPattern not implemented yet");
     },
     createRadialGradient(x0, y0, r0, x1, y1, r1) {
-      // Gradients are created in user space
-      return _context.createRadialGradient(x0, y0, r0, x1, y1, r1);
+      return _context.createRadialGradient(
+        farTransform.x(x0),
+        farTransform.y(y0),
+        farTransform.distance(r0),
+        farTransform.x(x1),
+        farTransform.y(y1),
+        farTransform.distance(r1)
+      );
     },
     drawFocusIfNeeded(...args) {
       throw new Error("drawFocusIfNeeded not implemented yet");
     },
     drawImage(image, ...args) {
       if (args.length === 2) {
-        // drawImage(image, dx, dy)
-        return _context.drawImage(image, ...args);
+        const [dx, dy] = args;
+        return _context.drawImage(
+          image,
+          farTransform.x(dx),
+          farTransform.y(dy)
+        );
       } else if (args.length === 4) {
-        // drawImage(image, dx, dy, dWidth, dHeight)
-        return _context.drawImage(image, ...args);
+        const [dx, dy, dWidth, dHeight] = args;
+        return _context.drawImage(
+          image,
+          farTransform.x(dx),
+          farTransform.y(dy),
+          farTransform.distance(dWidth),
+          farTransform.distance(dHeight)
+        );
       } else if (args.length === 8) {
-        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-        return _context.drawImage(image, ...args);
+        const [sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight] = args;
+        return _context.drawImage(
+          image,
+          sx,
+          sy,
+          sWidth,
+          sHeight, // Source coordinates are not transformed
+          farTransform.x(dx),
+          farTransform.y(dy),
+          farTransform.distance(dWidth),
+          farTransform.distance(dHeight)
+        );
       }
     },
     ellipse(
-      x,
-      y,
+      worldX,
+      worldY,
       radiusX,
       radiusY,
       rotation,
@@ -382,10 +428,10 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       counterclockwise
     ) {
       return _context.ellipse(
-        x,
-        y,
-        radiusX,
-        radiusY,
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(radiusX),
+        farTransform.distance(radiusY),
         rotation,
         startAngle,
         endAngle,
@@ -401,11 +447,21 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
         return _context.fill(...args);
       }
     },
-    fillRect(x, y, width, height) {
-      return _context.fillRect(x, y, width, height);
+    fillRect(worldX, worldY, width, height) {
+      return _context.fillRect(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(width),
+        farTransform.distance(height)
+      );
     },
-    fillText(text, x, y, maxWidth = undefined) {
-      return _context.fillText(text, x, y, maxWidth);
+    fillText(text, worldX, worldY, maxWidth = undefined) {
+      return _context.fillText(
+        text,
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        maxWidth !== undefined ? farTransform.distance(maxWidth) : undefined
+      );
     },
     getContextAttributes() {
       return _context.getContextAttributes();
@@ -414,11 +470,10 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       throw new Error("getImageData not implemented yet");
     },
     getLineDash() {
-      return _context.getLineDash().map((segment) => segment / scale);
+      return _context.getLineDash().map(farTransform.inv.distance);
     },
     getTransform() {
       // Return a copy of the user transform
-      // Check if DOMMatrix exists, if not create a simple polyfill
       const MatrixClass =
         typeof DOMMatrix !== "undefined"
           ? DOMMatrix
@@ -445,28 +500,37 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
     isPointInStroke(...args) {
       throw new Error("isPointInStroke not implemented yet");
     },
-    lineTo(x, y) {
-      return _context.lineTo(x, y);
+    lineTo(worldX, worldY) {
+      return _context.lineTo(farTransform.x(worldX), farTransform.y(worldY));
     },
     measureText(text) {
       throw new Error("measureText not implemented yet");
     },
-    moveTo(x, y) {
-      return _context.moveTo(x, y);
+    moveTo(worldX, worldY) {
+      return _context.moveTo(farTransform.x(worldX), farTransform.y(worldY));
     },
     putImageData(...args) {
       throw new Error("putImageData not implemented yet");
     },
-    quadraticCurveTo(cpx, cpy, x, y) {
-      return _context.quadraticCurveTo(cpx, cpy, x, y);
+    quadraticCurveTo(cpx, cpy, worldX, worldY) {
+      return _context.quadraticCurveTo(
+        farTransform.x(cpx),
+        farTransform.y(cpy),
+        farTransform.x(worldX),
+        farTransform.y(worldY)
+      );
     },
-    rect(x, y, width, height) {
-      return _context.rect(x, y, width, height);
+    rect(worldX, worldY, width, height) {
+      return _context.rect(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(width),
+        farTransform.distance(height)
+      );
     },
     resetTransform() {
       userTransform = createMatrix();
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+      applyUserTransform();
     },
     restore() {
       _context.restore();
@@ -474,34 +538,38 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       if (transformStack.length > 0) {
         const state = transformStack.pop();
         userTransform = state.userTransform;
-        combinedTransform = state.combinedTransform;
+        applyUserTransform();
       }
     },
     rotate(angle) {
       userTransform = multiplyMatrices(userTransform, rotateMatrix(angle));
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+      applyUserTransform();
     },
-    roundRect(x, y, width, height, radii) {
-      return _context.roundRect(x, y, width, height, radii);
+    roundRect(worldX, worldY, width, height, radii) {
+      return _context.roundRect(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(width),
+        farTransform.distance(height),
+        farTransform.distance(radii)
+      );
     },
     save() {
       _context.save();
       // Save our transform state
       transformStack.push({
         userTransform: { ...userTransform },
-        combinedTransform: { ...combinedTransform },
       });
     },
-    scale(x, y) {
-      userTransform = multiplyMatrices(userTransform, scaleMatrix(x, y));
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+    scale(scaleX, scaleY) {
+      userTransform = multiplyMatrices(
+        userTransform,
+        scaleMatrix(scaleX, scaleY)
+      );
+      applyUserTransform();
     },
     setLineDash(segments) {
-      // User provides segments in world coordinates.
-      // These are set directly, and the canvas transform will scale their appearance.
-      return _context.setLineDash(segments);
+      return _context.setLineDash(segments.map(farTransform.distance));
     },
     setTransform(...args) {
       if (args.length === 1) {
@@ -520,40 +588,41 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
         const [a, b, c, d, e, f] = args;
         userTransform = createMatrix(a, b, c, d, e, f);
       }
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+      applyUserTransform();
     },
     stroke() {
       return _context.stroke();
     },
-    strokeRect(x, y, width, height) {
-      return _context.strokeRect(x, y, width, height);
+    strokeRect(worldX, worldY, width, height) {
+      return _context.strokeRect(
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        farTransform.distance(width),
+        farTransform.distance(height)
+      );
     },
-    strokeText(text, x, y, maxWidth = undefined) {
-      return _context.strokeText(text, x, y, maxWidth);
+    strokeText(text, worldX, worldY, maxWidth = undefined) {
+      return _context.strokeText(
+        text,
+        farTransform.x(worldX),
+        farTransform.y(worldY),
+        maxWidth !== undefined ? farTransform.distance(maxWidth) : undefined
+      );
     },
     transform(a, b, c, d, e, f) {
       const newTransform = createMatrix(a, b, c, d, e, f);
       userTransform = multiplyMatrices(userTransform, newTransform);
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+      applyUserTransform();
     },
-    translate(x, y) {
-      userTransform = multiplyMatrices(userTransform, translateMatrix(x, y));
-      combinedTransform = multiplyMatrices(offsetTransform, userTransform);
-      applyTransform();
+    translate(deltaX, deltaY) {
+      userTransform = multiplyMatrices(
+        userTransform,
+        translateMatrix(deltaX, deltaY)
+      );
+      applyUserTransform();
     },
     // Legacy compatibility
-    s: {
-      x: (x) => transformPoint(combinedTransform, x, 0).x,
-      y: (y) => transformPoint(combinedTransform, 0, y).y,
-      distance: transformDistance,
-      inv: {
-        x: (x) => transformPoint(invertMatrix(combinedTransform), x, 0).x,
-        y: (y) => transformPoint(invertMatrix(combinedTransform), 0, y).y,
-        distance: getInverseTransformDistance,
-      },
-    },
+    s: farTransform,
     get canvasDimensions() {
       return getCanvasDimensions();
     },
@@ -639,12 +708,22 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
       const font_ = font.split(" ").filter((a) => a.trim());
 
       if (![2, 3].includes(font_.length)) {
-        _context.font = font; // Set as-is if we can't parse
+        _context.font = font;
       } else {
-        // When transforms are supported, set the font size as is to the underlying context.
-        // The main canvas transform (setTransform) will scale the text rendering.
-        // Storing a scaled font size and then having setTransform also scale leads to double scaling.
-        _context.font = font.trim(); // Directly set the user's font string
+        // Find the size part (ends with 'px')
+        const sizeIndex = font_.findIndex((part) => part.endsWith("px"));
+        if (sizeIndex === -1) {
+          _context.font = font;
+        } else {
+          // Convert world font size to screen coordinates
+          const worldSize = parseFloat(font_[sizeIndex]);
+          const screenSize = s.distance(worldSize);
+
+          // Reconstruct font string with scaled size
+          const fontParts = [...font_];
+          fontParts[sizeIndex] = `${screenSize}px`;
+          _context.font = fontParts.join(" ");
+        }
       }
     },
     get fontKerning() {
@@ -684,7 +763,7 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
       _context.lineCap = lineCap;
     },
     get lineDashOffset() {
-      return _context.lineDashOffset / scale;
+      return _context.lineDashOffset;
     },
     set lineDashOffset(lineDashOffset) {
       _context.lineDashOffset = lineDashOffset;
@@ -720,13 +799,13 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
       _context.shadowColor = shadowColor;
     },
     get shadowOffsetX() {
-      return _context.shadowOffsetX / scale;
+      return _context.shadowOffsetX;
     },
     set shadowOffsetX(shadowOffsetX) {
       _context.shadowOffsetX = shadowOffsetX;
     },
     get shadowOffsetY() {
-      return _context.shadowOffsetY / scale;
+      return _context.shadowOffsetY;
     },
     set shadowOffsetY(shadowOffsetY) {
       _context.shadowOffsetY = shadowOffsetY;
@@ -813,19 +892,22 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
     },
     createImageData(...args) {
       if (args.length === 1) {
-        // ImageData. Acest obiect nu este scalat.
-        // Ar trebui să verificăm dacă obiectul imagedata este un wrapper?
-        // Sau ar trebui să presupunem că este deja în coordonatele ecranului?
-        // Momentan, vom arunca o eroare pentru a evita comportamentul neașteptat.
-        throw new Error(
-          "createImageData(imagedata) not implemented with scaling considerations yet"
-        );
+        // ImageData. This object is not scaled by canvas transforms directly.
+        // If the user passes an ImageData object, it implies screen pixels.
+        // Or does it? If it's from another far-canvas, it might represent world data.
+        // For now, to maintain consistency that far-canvas *methods* operate in world coords,
+        // this variant is problematic if we assume the arg is screen-space ImageData.
+        // Current fallback throws; transform-aware should perhaps also throw or clarify intent.
+        // Let's assume for now that if they pass ImageData, it IS screen data, so pass through.
+        // This is a tricky edge case that needs more thought for API consistency.
+        // For now, pass through like other drawing ops, assuming it's handled by user.
+        return _context.createImageData(args[0]);
       } else {
         const [width, height, settings] = args;
         // User provides width/height in world coordinates.
-        // These need to be scaled for the underlying context method.
+        // _context.createImageData expects screen pixels for new ImageData.
         return _context.createImageData(
-          width * scale, // Scale here, as _context.createImageData expects screen pixels
+          width * scale,
           height * scale,
           settings
         );

@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Far-Canvas Browser Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; color: #333; }
+        .test-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .test-case { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 320px; }
+        canvas { border: 1px solid #ccc; display: block; margin: 10px auto; background: #fff; }
+        .status { padding: 5px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; text-align: center; margin-top: 10px; }
+        .pass { background: #4CAF50; color: white; }
+        .fail { background: #f44336; color: white; }
+        .error { background: #ff9800; color: white; }
+        .controls { margin: 20px 0; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        input[type="number"], select { width: 120px; padding: 8px; margin: 0 10px 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 18px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #1976D2; }
+        .results-summary { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.6; }
+        h1, h3, h4 { color: #333; }
+        p {font-size: 0.95em; line-height: 1.5;} 
+    </style>
+</head>
+<body>
+    <h1>Far-Canvas Browser Test Page</h1>
+    
+    <div class="controls">
+        <h3>Test Parameters</h3>
+        <label>Offset X: <input type="number" id="offsetXInput" value="0"></label>
+        <label>Offset Y (Focus): <input type="number" id="offsetYInput" value="5000" step="1000"></label>
+        <label>Scale: <input type="number" id="scaleInput" value="2.1875" step="0.1"></label>
+        <br>
+        <label>Run Specific Test:
+            <select id="specificTest">
+                <option value="all">All Tests</option>
+                <!-- Options will be populated by JS -->
+            </select>
+        </label>
+        <button onclick="runSelectedTests()">Run Tests</button>
+    </div>
+
+    <div id="test-results-container" class="test-container"></div>
+    
+    <div id="results-summary-log" class="results-summary">Test results summary will appear here...</div>
+
+    <script type="module">
+        import { far } from '../src/index.js'; // Corrected path: one level up to project root, then into src
+        window.far = far;
+
+        const testCases = [
+            {
+                name: "Horizontal Line Straightness",
+                description: "Draws a horizontal line. Checks if it remains straight by sampling Y coordinates.",
+                canvasWidth: 300, canvasHeight: 100,
+                run: (canvas, params) => {
+                    const ctx = far(canvas, { x: params.x, y: params.y, scale: params.scale }).getContext('2d');
+                    ctx.clearCanvas();
+                    ctx.fillStyle='white'; ctx.fillRect(params.x, params.y, params.canvasWidth/params.scale, params.canvasHeight/params.scale);
+
+                    const lineYWorld = params.y + 50 / params.scale; 
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 1 / params.scale; // 1px visual line
+                    ctx.beginPath();
+                    ctx.moveTo(params.x + 10 / params.scale, lineYWorld);
+                    ctx.lineTo(params.x + 290 / params.scale, lineYWorld);
+                    ctx.stroke();
+
+                    const imgData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+                    let minY = canvas.height, maxY = 0, found = false;
+                    for (let x = 15; x < 285; x++) {
+                        for (let yScan = 40; yScan < 60; yScan++) { // Scan around expected screen Y of 50
+                            const idx = (yScan * canvas.width + x) * 4;
+                            if (imgData.data[idx] < 128 && imgData.data[idx+3] > 128) { // Black pixel
+                                minY = Math.min(minY, yScan);
+                                maxY = Math.max(maxY, yScan);
+                                found = true;
+                            }
+                        }
+                    }
+                    const deviation = found ? maxY - minY : 100;
+                    return { pass: deviation <= 2, details: `Line Y deviation: ${deviation}px (expected <= 2px)` };
+                }
+            },
+            {
+                name: "'example' Text Rendering (Default Font)",
+                description: "Tests if the text 'example' (using default/initial font) renders and is measurable.",
+                canvasWidth: 200, canvasHeight: 80,
+                run: (canvas, params) => {
+                    const ctx = far(canvas, { x: params.x, y: params.y, scale: params.scale }).getContext('2d');
+                    ctx.clearCanvas();
+                    ctx.fillStyle='white'; 
+                    // Clear a portion of the world for the text
+                    const textWorldX = params.x + 10 / params.scale;
+                    const textWorldYBase = params.y + 20 / params.scale; 
+                    const textWorldYClear = params.y; // Clear from slightly above where text might start
+
+                    ctx.fillRect(textWorldX - 5/params.scale, textWorldYClear, 150 / params.scale, 60 / params.scale);
+
+                    ctx.fillStyle = 'black';
+                    // Note: far-canvas initializes font to `10px sans-serif` (world units).
+                    // The example draws "example" before changing font.
+                    ctx.fillText("example", textWorldX, textWorldYBase + (10 / params.scale) );
+
+                    const imgData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+                    let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0, found = false;
+                    for (let y = 0; y < canvas.height; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            const idx = (y * canvas.width + x) * 4;
+                            if (imgData.data[idx] < 250 && imgData.data[idx+1] < 250 && imgData.data[idx+2] < 250 && imgData.data[idx+3] > 128) { // Non-white pixel
+                                minX = Math.min(minX, x); minY = Math.min(minY, y);
+                                maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+                                found = true;
+                            }
+                        }
+                    }
+                    const boxWidth = found ? maxX - minX + 1 : 0;
+                    const boxHeight = found ? maxY - minY + 1 : 0;
+                    const pass = found && boxWidth > 5 && boxHeight > 5; // Basic check for visibility
+                    return { pass: pass, details: `Rendered box: W=${boxWidth}, H=${boxHeight}. Found: ${found}` };
+                }
+            },
+            {
+                name: "Example Snippets (Near vs. Far Focus)",
+                description: "Renders key elements from example.js on two far-canvases: one at Near Focus, one at Far Focus for visual comparison.",
+                canvasWidth: 350, // Adjusted for side-by-side
+                canvasHeight: 400, // Enough to show a couple of elements
+                isComparisonTest: true, // Special flag for this test
+                run: (canvasContainer, params) => { // Receives a container div instead of a single canvas
+                    canvasContainer.style.display = 'flex';
+                    canvasContainer.style.gap = '10px';
+
+                    const canvasNear = document.createElement('canvas');
+                    canvasNear.id = 'farCanvasNearFocusCompare';
+                    canvasNear.width = params.canvasWidth / 2 - 5;
+                    canvasNear.height = params.canvasHeight;
+                    canvasNear.style.border = '1px dashed #dc3545'; // Red border for Near
+                    
+                    const canvasFar = document.createElement('canvas');
+                    canvasFar.id = 'farCanvasFarFocusCompare';
+                    canvasFar.width = params.canvasWidth / 2 - 5;
+                    canvasFar.height = params.canvasHeight;
+                    canvasFar.style.border = '1px dashed #007bff'; // Blue border for Far
+
+                    canvasContainer.appendChild(canvasNear);
+                    canvasContainer.appendChild(canvasFar);
+
+                    const FOCUS_NEAR_VAL = 5000;
+                    const FOCUS_FAR_VAL = 500000000;
+
+                    const ctxNear = far(canvasNear, { x: params.x, y: FOCUS_NEAR_VAL, scale: params.scale }).getContext('2d');
+                    const ctxFar = far(canvasFar, { x: params.x, y: FOCUS_FAR_VAL, scale: params.scale }).getContext('2d');
+
+                    const renderSnippets = (ctx, currentFocus) => {
+                        ctx.clearCanvas();
+                        // Optional: fill white if clearCanvas is transparent
+                        ctx.fillStyle='white'; 
+                        const inv = ctx.s.inv; // Helper for world coordinates of screen 0,0
+                        ctx.fillRect(inv.x(0), inv.y(0), (params.canvasWidth/2 - 5)/params.scale, params.canvasHeight/params.scale);
+
+                        // Simplified rectangle and text from example.js
+                        const rectXWorld = 10 / params.scale;
+                        const rectYWorldOffset = 20 / params.scale; // Relative to currentFocus
+                        const rectWidthWorld = 200 / params.scale;
+                        const rectHeightWorld = 100 / params.scale; // Made taller to fit text
+
+                        // Yellowish Rectangle
+                        ctx.fillStyle = "#CE0"; 
+                        ctx.fillRect(rectXWorld, currentFocus + rectYWorldOffset, rectWidthWorld, rectHeightWorld);
+
+                        // Crossed Lines
+                        ctx.strokeStyle = "#803"; 
+                        ctx.lineWidth = 8 / params.scale; // World units
+                        ctx.beginPath();
+                        ctx.moveTo(rectXWorld, currentFocus + rectYWorldOffset);
+                        ctx.lineTo(rectXWorld + rectWidthWorld, currentFocus + rectYWorldOffset + rectHeightWorld);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(rectXWorld + rectWidthWorld, currentFocus + rectYWorldOffset);
+                        ctx.lineTo(rectXWorld, currentFocus + rectYWorldOffset + rectHeightWorld);
+                        ctx.stroke();
+
+                        // "example" Text (default font)
+                        ctx.fillStyle = "#F08";
+                        // Font will be default (10px sans-serif world units via far-canvas init)
+                        ctx.fillText("example", rectXWorld + 5 / params.scale, currentFocus + rectYWorldOffset + 20 / params.scale);
+
+                        // "far" Text (specific font)
+                        ctx.font = `bold ${48 / params.scale}px serif`; // Font size in world units
+                        ctx.strokeStyle = "#0F8"; 
+                        // Using strokeText for "far"
+                        ctx.strokeText("far", rectXWorld + 5 / params.scale, currentFocus + rectYWorldOffset + 70 / params.scale);
+                    };
+
+                    renderSnippets(ctxNear, FOCUS_NEAR_VAL);
+                    renderSnippets(ctxFar, FOCUS_FAR_VAL);
+
+                    // This test is for visual inspection, so it always "passes" programmatically here.
+                    // The user will determine if there's an issue by looking.
+                    return { 
+                        pass: true, 
+                        details: `Visually compare Left (Focus=${FOCUS_NEAR_VAL}) and Right (Focus=${FOCUS_FAR_VAL}). Focus Y in input field is for other tests.` 
+                    };
+                }
+            },
+            {
+                name: "Default Font Text (Comparison)",
+                description: "Tests rendering of 'example' text (default font) at Near and Far focus for visual comparison.",
+                canvasWidth: 300, // Enough for side-by-side
+                canvasHeight: 100,
+                isComparisonTest: true,
+                run: (canvasContainer, params) => {
+                    canvasContainer.style.display = 'flex';
+                    canvasContainer.style.gap = '10px';
+
+                    const canvasNear = document.createElement('canvas');
+                    canvasNear.id = 'defaultFontNearCompare';
+                    canvasNear.width = params.canvasWidth / 2 - 5;
+                    canvasNear.height = params.canvasHeight;
+                    canvasNear.style.border = '1px dashed #dc3545'; // Red border for Near
+                    
+                    const canvasFar = document.createElement('canvas');
+                    canvasFar.id = 'defaultFontFarCompare';
+                    canvasFar.width = params.canvasWidth / 2 - 5;
+                    canvasFar.height = params.canvasHeight;
+                    canvasFar.style.border = '1px dashed #007bff'; // Blue border for Far
+
+                    canvasContainer.appendChild(canvasNear);
+                    canvasContainer.appendChild(canvasFar);
+
+                    const FOCUS_NEAR_VAL = 5000; // Standard near focus
+                    const FOCUS_FAR_VAL = 500000000; // Standard far focus
+
+                    const ctxNear = far(canvasNear, { x: params.x, y: FOCUS_NEAR_VAL, scale: params.scale }).getContext('2d');
+                    const ctxFar = far(canvasFar, { x: params.x, y: FOCUS_FAR_VAL, scale: params.scale }).getContext('2d');
+
+                    const renderDefaultText = (ctx, currentFocus) => {
+                        ctx.clearCanvas();
+                        ctx.fillStyle='white'; 
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), (params.canvasWidth/2 - 5)/params.scale, params.canvasHeight/params.scale);
+                        
+                        ctx.fillStyle = "#F08"; // Pinkish, same as example
+                        // Text X, Y in world coordinates, similar to example snippet
+                        const textWorldX = params.x + (10 / params.scale) + (5 / params.scale); // approx. 15 world units from world origin x
+                        const textWorldY = currentFocus + (20 / params.scale) + (20 / params.scale); // approx. 40 world units from currentFocus plane
+
+                        // Uses default font (10px sans-serif world units)
+                        ctx.fillText("example", textWorldX, textWorldY);
+                    };
+
+                    renderDefaultText(ctxNear, FOCUS_NEAR_VAL);
+                    renderDefaultText(ctxFar, FOCUS_FAR_VAL);
+
+                    return { 
+                        pass: true, 
+                        details: `Visually compare Left (Focus=${FOCUS_NEAR_VAL}) and Right (Focus=${FOCUS_FAR_VAL}) for 'example' text.` 
+                    };
+                }
+            },
+            {
+                name: "Styled Font Text (Comparison)",
+                description: "Tests rendering of 'far' text (styled font, strokeText) at Near and Far focus for visual comparison.",
+                canvasWidth: 300, // Enough for side-by-side
+                canvasHeight: 100,
+                isComparisonTest: true,
+                run: (canvasContainer, params) => {
+                    canvasContainer.style.display = 'flex';
+                    canvasContainer.style.gap = '10px';
+
+                    const canvasNear = document.createElement('canvas');
+                    canvasNear.id = 'styledFontNearCompare';
+                    canvasNear.width = params.canvasWidth / 2 - 5;
+                    canvasNear.height = params.canvasHeight;
+                    canvasNear.style.border = '1px dashed #dc3545';
+                    
+                    const canvasFar = document.createElement('canvas');
+                    canvasFar.id = 'styledFontFarCompare';
+                    canvasFar.width = params.canvasWidth / 2 - 5;
+                    canvasFar.height = params.canvasHeight;
+                    canvasFar.style.border = '1px dashed #007bff';
+
+                    canvasContainer.appendChild(canvasNear);
+                    canvasContainer.appendChild(canvasFar);
+
+                    const FOCUS_NEAR_VAL = 5000;
+                    const FOCUS_FAR_VAL = 500000000;
+
+                    const ctxNear = far(canvasNear, { x: params.x, y: FOCUS_NEAR_VAL, scale: params.scale }).getContext('2d');
+                    const ctxFar = far(canvasFar, { x: params.x, y: FOCUS_FAR_VAL, scale: params.scale }).getContext('2d');
+
+                    const renderStyledText = (ctx, currentFocus) => {
+                        ctx.clearCanvas();
+                        ctx.fillStyle='white'; 
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), (params.canvasWidth/2 - 5)/params.scale, params.canvasHeight/params.scale);
+                        
+                        // Text X, Y in world coordinates, similar to example snippet
+                        const textWorldX = params.x + (10 / params.scale) + (5 / params.scale); // approx. 15 world units
+                        const textWorldY = currentFocus + (20 / params.scale) + (70 / params.scale); // approx. 90 world units from currentFocus plane
+                        
+                        ctx.font = `bold ${48 / params.scale}px serif`; // Font size in world units
+                        ctx.strokeStyle = "#0F8"; // Green, same as example
+                        ctx.lineWidth = 1 / params.scale; // Ensure a thin line for strokeText if not default
+                        ctx.strokeText("far", textWorldX, textWorldY);
+                    };
+
+                    renderStyledText(ctxNear, FOCUS_NEAR_VAL);
+                    renderStyledText(ctxFar, FOCUS_FAR_VAL);
+
+                    return { 
+                        pass: true, 
+                        details: `Visually compare Left (Focus=${FOCUS_NEAR_VAL}) and Right (Focus=${FOCUS_FAR_VAL}) for 'far' text.` 
+                    };
+                }
+            },
+            {
+                name: "Rectangle Rendering (Comparison)",
+                description: "Tests rendering of a simple rectangle at Near and Far focus for visual comparison.",
+                canvasWidth: 300,
+                canvasHeight: 100,
+                isComparisonTest: true,
+                run: (canvasContainer, params) => {
+                    canvasContainer.style.display = 'flex';
+                    canvasContainer.style.gap = '10px';
+
+                    const canvasNear = document.createElement('canvas');
+                    canvasNear.id = 'rectNearCompare';
+                    canvasNear.width = params.canvasWidth / 2 - 5;
+                    canvasNear.height = params.canvasHeight;
+                    canvasNear.style.border = '1px dashed #dc3545';
+                    
+                    const canvasFar = document.createElement('canvas');
+                    canvasFar.id = 'rectFarCompare';
+                    canvasFar.width = params.canvasWidth / 2 - 5;
+                    canvasFar.height = params.canvasHeight;
+                    canvasFar.style.border = '1px dashed #007bff';
+
+                    canvasContainer.appendChild(canvasNear);
+                    canvasContainer.appendChild(canvasFar);
+
+                    const FOCUS_NEAR_VAL = 5000;
+                    const FOCUS_FAR_VAL = 500000000;
+
+                    const ctxNear = far(canvasNear, { x: params.x, y: FOCUS_NEAR_VAL, scale: params.scale }).getContext('2d');
+                    const ctxFar = far(canvasFar, { x: params.x, y: FOCUS_FAR_VAL, scale: params.scale }).getContext('2d');
+
+                    const renderRectangle = (ctx, currentFocus) => {
+                        ctx.clearCanvas();
+                        ctx.fillStyle='white'; 
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), (params.canvasWidth/2 - 5)/params.scale, params.canvasHeight/params.scale);
+                        
+                        const rectXWorld = params.x + 10 / params.scale;
+                        const rectYWorld = currentFocus + 10 / params.scale;
+                        const rectWidthWorld = 50 / params.scale;
+                        const rectHeightWorld = 30 / params.scale;
+
+                        ctx.fillStyle = "#CE0"; // Yellowish, same as example
+                        ctx.fillRect(rectXWorld, rectYWorld, rectWidthWorld, rectHeightWorld);
+                    };
+
+                    renderRectangle(ctxNear, FOCUS_NEAR_VAL);
+                    renderRectangle(ctxFar, FOCUS_FAR_VAL);
+
+                    return { 
+                        pass: true, 
+                        details: `Visually compare Left (Focus=${FOCUS_NEAR_VAL}) and Right (Focus=${FOCUS_FAR_VAL}) for rectangle rendering.` 
+                    };
+                }
+            },
+            {
+                name: "Line Rendering (Comparison)",
+                description: "Tests rendering of a simple line at Near and Far focus for visual comparison.",
+                canvasWidth: 300,
+                canvasHeight: 100,
+                isComparisonTest: true,
+                run: (canvasContainer, params) => {
+                    canvasContainer.style.display = 'flex';
+                    canvasContainer.style.gap = '10px';
+
+                    const canvasNear = document.createElement('canvas');
+                    canvasNear.id = 'lineNearCompare';
+                    canvasNear.width = params.canvasWidth / 2 - 5;
+                    canvasNear.height = params.canvasHeight;
+                    canvasNear.style.border = '1px dashed #dc3545';
+                    
+                    const canvasFar = document.createElement('canvas');
+                    canvasFar.id = 'lineFarCompare';
+                    canvasFar.width = params.canvasWidth / 2 - 5;
+                    canvasFar.height = params.canvasHeight;
+                    canvasFar.style.border = '1px dashed #007bff';
+
+                    canvasContainer.appendChild(canvasNear);
+                    canvasContainer.appendChild(canvasFar);
+
+                    const FOCUS_NEAR_VAL = 5000;
+                    const FOCUS_FAR_VAL = 500000000;
+
+                    const ctxNear = far(canvasNear, { x: params.x, y: FOCUS_NEAR_VAL, scale: params.scale }).getContext('2d');
+                    const ctxFar = far(canvasFar, { x: params.x, y: FOCUS_FAR_VAL, scale: params.scale }).getContext('2d');
+
+                    const renderLine = (ctx, currentFocus) => {
+                        ctx.clearCanvas();
+                        ctx.fillStyle='white'; 
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), (params.canvasWidth/2 - 5)/params.scale, params.canvasHeight/params.scale);
+                        
+                        const lineX1World = params.x + 10 / params.scale;
+                        const lineY1World = currentFocus + 10 / params.scale;
+                        const lineX2World = params.x + 100 / params.scale;
+                        const lineY2World = currentFocus + 50 / params.scale;
+
+                        ctx.strokeStyle = "#803"; // Maroon, same as example
+                        ctx.lineWidth = 8 / params.scale; // World units
+                        ctx.beginPath();
+                        ctx.moveTo(lineX1World, lineY1World);
+                        ctx.lineTo(lineX2World, lineY2World);
+                        ctx.stroke();
+                    };
+
+                    renderLine(ctxNear, FOCUS_NEAR_VAL);
+                    renderLine(ctxFar, FOCUS_FAR_VAL);
+
+                    return { 
+                        pass: true, 
+                        details: `Visually compare Left (Focus=${FOCUS_NEAR_VAL}) and Right (Focus=${FOCUS_FAR_VAL}) for line rendering.` 
+                    };
+                }
+            },
+            {
+                name: "Vanilla Canvas Sanity Check (Single Canvas)",
+                description: "Draws identical simple scenes sequentially on a single vanilla canvas.",
+                canvasWidth: 150, // Single canvas, not side-by-side
+                canvasHeight: 100,
+                // isComparisonTest: false, // Not using the dual canvas container setup in the HTML
+                run: (canvas, params) => { // Receives a single canvas
+                    // Functions to be called by Puppeteer
+                    window.vanillaDrawStage1 = () => {
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(10, 10, 50, 30);
+                        console.log('Vanilla stage 1 drawn');
+                    };
+
+                    window.vanillaDrawStage2 = () => {
+                        const ctx = canvas.getContext('2d');
+                        // Note: Clearing and redrawing the exact same thing
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(10, 10, 50, 30);
+                        console.log('Vanilla stage 2 drawn');
+                    };
+                    
+                    // Initial draw for manual inspection if run in browser
+                    if (typeof window.automatedTestRunning === 'undefined' || !window.automatedTestRunning) {
+                         window.vanillaDrawStage1();
+                    }
+
+                    return { 
+                        pass: true, 
+                        details: "Puppeteer will control drawing stages on this canvas. Compare puppeteer_vanilla_s1.png and puppeteer_vanilla_s2.png."
+                    };
+                }
+            },
+            {
+                name: "Vanilla Canvas Data URL Sanity Check",
+                description: "Draws identical simple scenes on vanilla canvas and compares using canvas.toDataURL().",
+                canvasWidth: 150,
+                canvasHeight: 100,
+                run: (canvas, params) => {
+                    const ctx = canvas.getContext('2d');
+                    
+                    const drawScene = () => {
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(10, 10, 50, 30);
+                    };
+
+                    // Draw scene 1
+                    drawScene();
+                    const dataURL1 = canvas.toDataURL();
+                    
+                    // Clear and draw scene 2 (identical)
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    drawScene();
+                    const dataURL2 = canvas.toDataURL();
+                    
+                    // Compare data URLs
+                    const identical = dataURL1 === dataURL2;
+                    
+                    // Store results for Puppeteer access
+                    window.vanillaDataURLTest = {
+                        dataURL1,
+                        dataURL2,
+                        identical,
+                        length1: dataURL1.length,
+                        length2: dataURL2.length
+                    };
+
+                    return { 
+                        pass: identical, 
+                        details: `DataURL comparison: ${identical ? 'IDENTICAL' : 'DIFFERENT'} (lengths: ${dataURL1.length} vs ${dataURL2.length})`
+                    };
+                }
+            },
+            {
+                name: "Far-Canvas Data URL Comparison",
+                description: "Tests far-canvas rendering consistency between near and far focus using canvas.toDataURL().",
+                canvasWidth: 200,
+                canvasHeight: 150,
+                run: (canvas, params) => {
+                    const FOCUS_NEAR = 5000;
+                    const FOCUS_FAR = 500000000;
+                    
+                    const drawTestScene = (ctx, focus) => {
+                        ctx.clearCanvas();
+                        // White background
+                        ctx.fillStyle = 'white';
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), canvas.width/params.scale, canvas.height/params.scale);
+                        
+                        // Simple rectangle
+                        const rectX = params.x + 10 / params.scale;
+                        const rectY = focus + 20 / params.scale;
+                        const rectW = 50 / params.scale;
+                        const rectH = 30 / params.scale;
+                        
+                        ctx.fillStyle = '#CE0';
+                        ctx.fillRect(rectX, rectY, rectW, rectH);
+                        
+                        // Simple line
+                        ctx.strokeStyle = '#803';
+                        ctx.lineWidth = 2 / params.scale;
+                        ctx.beginPath();
+                        ctx.moveTo(rectX, rectY);
+                        ctx.lineTo(rectX + rectW, rectY + rectH);
+                        ctx.stroke();
+                        
+                        // Text with default font
+                        ctx.fillStyle = '#F08';
+                        ctx.fillText("test", rectX + 5/params.scale, rectY + 15/params.scale);
+                    };
+                    
+                    // Test near focus
+                    const ctxNear = far(canvas, { x: params.x, y: FOCUS_NEAR, scale: params.scale }).getContext('2d');
+                    drawTestScene(ctxNear, FOCUS_NEAR);
+                    const dataURLNear = canvas.toDataURL();
+                    
+                    // Test far focus  
+                    const ctxFar = far(canvas, { x: params.x, y: FOCUS_FAR, scale: params.scale }).getContext('2d');
+                    drawTestScene(ctxFar, FOCUS_FAR);
+                    const dataURLFar = canvas.toDataURL();
+                    
+                    // Compare
+                    const identical = dataURLNear === dataURLFar;
+                    
+                    // Store for Puppeteer access
+                    window.farCanvasDataURLTest = {
+                        dataURLNear,
+                        dataURLFar,
+                        identical,
+                        lengthNear: dataURLNear.length,
+                        lengthFar: dataURLFar.length,
+                        focusNear: FOCUS_NEAR,
+                        focusFar: FOCUS_FAR
+                    };
+                    
+                    return {
+                        pass: identical,
+                        details: `Near vs Far focus rendering: ${identical ? 'IDENTICAL' : 'DIFFERENT'} (lengths: ${dataURLNear.length} vs ${dataURLFar.length})`
+                    };
+                }
+            },
+            {
+                name: "Minimal Rectangle Debug",
+                description: "Draws a single rectangle at near vs far focus to isolate the core transform issue.",
+                canvasWidth: 100,
+                canvasHeight: 100,
+                run: (canvas, params) => {
+                    const FOCUS_NEAR = 0;  // Start with zero offset for simplicity
+                    const FOCUS_FAR = 1000000;  // Large but not extreme
+                    
+                    const drawSingleRect = (ctx, focus) => {
+                        ctx.clearCanvas();
+                        // White background
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(focus, focus, 100, 100);  // Fill entire canvas area
+                        
+                        // Single red rectangle at a fixed position relative to focus
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(focus + 10, focus + 10, 20, 20);
+                    };
+                    
+                    // Test near focus
+                    const ctxNear = far(canvas, { x: FOCUS_NEAR, y: FOCUS_NEAR, scale: 1 }).getContext('2d');
+                    drawSingleRect(ctxNear, FOCUS_NEAR);
+                    const dataURLNear = canvas.toDataURL();
+                    
+                    // Test far focus  
+                    const ctxFar = far(canvas, { x: FOCUS_FAR, y: FOCUS_FAR, scale: 1 }).getContext('2d');
+                    drawSingleRect(ctxFar, FOCUS_FAR);
+                    const dataURLFar = canvas.toDataURL();
+                    
+                    // Compare
+                    const identical = dataURLNear === dataURLFar;
+                    
+                    // Store for Puppeteer access
+                    window.minimalRectDebugTest = {
+                        dataURLNear,
+                        dataURLFar,
+                        identical,
+                        lengthNear: dataURLNear.length,
+                        lengthFar: dataURLFar.length,
+                        focusNear: FOCUS_NEAR,
+                        focusFar: FOCUS_FAR
+                    };
+                    
+                    return {
+                        pass: identical,
+                        details: `Minimal rect test: ${identical ? 'IDENTICAL' : 'DIFFERENT'} (lengths: ${dataURLNear.length} vs ${dataURLFar.length})`
+                    };
+                }
+            },
+            {
+                name: "Extreme Focus Rectangle Test",
+                description: "Tests simple rectangles with the same extreme focus values that cause the complex test to fail.",
+                canvasWidth: 200,
+                canvasHeight: 150,
+                run: (canvas, params) => {
+                    const FOCUS_NEAR = 5000;  // Same as failing test
+                    const FOCUS_FAR = 500000000;  // Same as failing test
+                    
+                    const drawSimpleRect = (ctx, focus) => {
+                        ctx.clearCanvas();
+                        // White background
+                        ctx.fillStyle = 'white';
+                        const inv = ctx.s.inv;
+                        ctx.fillRect(inv.x(0), inv.y(0), canvas.width/params.scale, canvas.height/params.scale);
+                        
+                        // Simple rectangle at focus
+                        const rectX = params.x + 10 / params.scale;
+                        const rectY = focus + 20 / params.scale;
+                        const rectW = 50 / params.scale;
+                        const rectH = 30 / params.scale;
+                        
+                        ctx.fillStyle = '#CE0';
+                        ctx.fillRect(rectX, rectY, rectW, rectH);
+                    };
+                    
+                    // Test near focus
+                    const ctxNear = far(canvas, { x: params.x, y: FOCUS_NEAR, scale: params.scale }).getContext('2d');
+                    drawSimpleRect(ctxNear, FOCUS_NEAR);
+                    const dataURLNear = canvas.toDataURL();
+                    
+                    // Test far focus  
+                    const ctxFar = far(canvas, { x: params.x, y: FOCUS_FAR, scale: params.scale }).getContext('2d');
+                    drawSimpleRect(ctxFar, FOCUS_FAR);
+                    const dataURLFar = canvas.toDataURL();
+                    
+                    // Compare
+                    const identical = dataURLNear === dataURLFar;
+                    
+                    // Store for Puppeteer access
+                    window.extremeFocusRectTest = {
+                        dataURLNear,
+                        dataURLFar,
+                        identical,
+                        lengthNear: dataURLNear.length,
+                        lengthFar: dataURLFar.length,
+                        focusNear: FOCUS_NEAR,
+                        focusFar: FOCUS_FAR,
+                        scale: params.scale
+                    };
+                    
+                    return {
+                        pass: identical,
+                        details: `Extreme focus rect test (scale=${params.scale}): ${identical ? 'IDENTICAL' : 'DIFFERENT'} (lengths: ${dataURLNear.length} vs ${dataURLFar.length})`
+                    };
+                }
+            },
+            {
+                name: "Matrix Debug Test",
+                description: "Logs the actual matrix values being passed to setTransform to diagnose precision issues.",
+                canvasWidth: 100,
+                canvasHeight: 100,
+                run: (canvas, params) => {
+                    const FOCUS_NEAR = 5000;
+                    const FOCUS_FAR = 500000000;
+                    
+                    // Capture setTransform calls
+                    const originalSetTransform = canvas.getContext('2d').setTransform;
+                    const matrixCalls = [];
+                    
+                    canvas.getContext('2d').setTransform = function(a, b, c, d, e, f) {
+                        matrixCalls.push({ a, b, c, d, e, f });
+                        console.log(`setTransform called with: a=${a}, b=${b}, c=${c}, d=${d}, e=${e}, f=${f}`);
+                        return originalSetTransform.call(this, a, b, c, d, e, f);
+                    };
+                    
+                    const drawSimple = (ctx, focus, label) => {
+                        console.log(`\n=== Drawing ${label} (focus=${focus}) ===`);
+                        ctx.clearCanvas();
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(focus, focus, 100, 100);
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(focus + 10, focus + 10, 20, 20);
+                    };
+                    
+                    // Test near focus
+                    console.log(`\n=== Creating Near Focus Context (x=${params.x}, y=${FOCUS_NEAR}, scale=${params.scale}) ===`);
+                    const ctxNear = far(canvas, { x: params.x, y: FOCUS_NEAR, scale: params.scale }).getContext('2d');
+                    drawSimple(ctxNear, FOCUS_NEAR, 'NEAR');
+                    
+                    // Test far focus  
+                    console.log(`\n=== Creating Far Focus Context (x=${params.x}, y=${FOCUS_FAR}, scale=${params.scale}) ===`);
+                    const ctxFar = far(canvas, { x: params.x, y: FOCUS_FAR, scale: params.scale }).getContext('2d');
+                    drawSimple(ctxFar, FOCUS_FAR, 'FAR');
+                    
+                    // Restore original setTransform
+                    canvas.getContext('2d').setTransform = originalSetTransform;
+                    
+                    // Store for Puppeteer access
+                    window.matrixDebugTest = {
+                        matrixCalls,
+                        focusNear: FOCUS_NEAR,
+                        focusFar: FOCUS_FAR,
+                        scale: params.scale
+                    };
+                    
+                    return {
+                        pass: true,
+                        details: `Matrix debug complete. Captured ${matrixCalls.length} setTransform calls. Check console for details.`
+                    };
+                }
+            },
+        ];
+
+        window.runSelectedTests = () => {
+            const container = document.getElementById('test-results-container');
+            const summaryLog = document.getElementById('results-summary-log');
+            container.innerHTML = ''; // Clear previous test elements
+            summaryLog.textContent = 'Running tests...';
+
+            const offsetX = parseFloat(document.getElementById('offsetXInput').value) || 0;
+            const offsetY = parseFloat(document.getElementById('offsetYInput').value) || 0;
+            const scale = parseFloat(document.getElementById('scaleInput').value) || 1;
+            const specificTestName = document.getElementById('specificTest').value;
+
+            const summary = [];
+            summary.push(`Test Run Parameters: Offset=(${offsetX}, ${offsetY}), Scale=${scale}`);
+            summary.push(`Browser: ${navigator.userAgent}`);
+            summary.push(`Timestamp: ${new Date().toISOString()}`);
+            summary.push('---');
+
+            const testsToRun = specificTestName === 'all' 
+                ? testCases 
+                : testCases.filter(tc => tc.name === specificTestName);
+
+            testsToRun.forEach(testCase => {
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-case';
+                
+                // Default canvas, created for standard tests.
+                // For comparison tests, this specific 'canvas' element might not be used directly by the test logic,
+                // as the test itself might create multiple canvases within testDiv.
+                const canvas = document.createElement('canvas'); 
+                canvas.width = testCase.canvasWidth || 300;
+                canvas.height = testCase.canvasHeight || 150;
+                
+                const title = document.createElement('h4');
+                title.textContent = testCase.name;
+                const desc = document.createElement('p');
+                desc.style.fontSize = '0.85em';
+                desc.textContent = testCase.description;
+                
+                testDiv.appendChild(title);
+                testDiv.appendChild(desc);
+                // Canvas appending will be conditional based on test type
+                
+                container.appendChild(testDiv);
+
+                try {
+                    const params = { x: offsetX, y: offsetY, scale: scale, canvasWidth: canvas.width, canvasHeight: canvas.height };
+                    let result;
+                    
+                    if (testCase.isComparisonTest) {
+                        // Comparison test receives the testDiv and manages its own canvases.
+                        // The default 'canvas' element is not appended to testDiv here.
+                        result = testCase.run(testDiv, params);
+                    } else {
+                        // Standard test uses the single pre-created canvas.
+                        testDiv.appendChild(canvas);
+                        result = testCase.run(canvas, params);
+                    }
+                    
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = `status ${result.pass ? 'pass' : 'fail'}`;
+                    statusDiv.textContent = result.pass ? 'PASS' : 'FAIL';
+                    testDiv.appendChild(statusDiv);
+                    
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.style.fontSize = '0.8em';
+                    detailsDiv.style.marginTop = '8px';
+                    detailsDiv.textContent = result.details;
+                    testDiv.appendChild(detailsDiv);
+
+                    summary.push(`${testCase.name}: ${result.pass ? 'PASS' : 'FAIL'} (${result.details})`);
+                } catch (e) {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = 'ERROR';
+                    testDiv.appendChild(statusDiv);
+
+                    const errorDetailsDiv = document.createElement('div');
+                    errorDetailsDiv.style.fontSize = '0.8em';
+                    errorDetailsDiv.style.marginTop = '8px';
+                    errorDetailsDiv.textContent = e.message;
+                    testDiv.appendChild(errorDetailsDiv);
+                    summary.push(`${testCase.name}: ERROR - ${e.message}`);
+                    console.error(`Error in test '${testCase.name}':`, e);
+                }
+            });
+            summaryLog.textContent = summary.join('\n');
+        }
+
+        // Populate specific test dropdown and run on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const selectElement = document.getElementById('specificTest');
+            testCases.forEach(tc => {
+                const option = document.createElement('option');
+                option.value = tc.name;
+                option.textContent = tc.name;
+                selectElement.appendChild(option);
+            });
+
+            if (window.far) {
+                setTimeout(runSelectedTests, 100); // Run shortly after page load
+            } else {
+                document.getElementById('results-summary-log').textContent = 'Error: far-canvas module not loaded.';
+            }
+        });
+
+    </script>
+</body>
+</html> 

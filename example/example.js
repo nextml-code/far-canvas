@@ -7,93 +7,122 @@ function getReferenceContext2d(element, transform) {
 }
 
 function getFarContext2d(element, transform) {
-  const context = far.far(element, transform).getContext("2d");
-
-  return context;
+  return far.far(element, transform).getContext("2d");
 }
 
 const referenceCanvas = document.getElementById("reference");
-const farCanvas = document.getElementById("far");
+const farNearCanvas = document.getElementById("far_near");
+const farFarCanvas = document.getElementById("far_far");
 
 const image = { data: document.createElement("img"), width: 320, height: 164 };
 const canvasDimensions = { width: 700, height: 1200 };
 
-referenceCanvas.width = canvasDimensions.width;
-referenceCanvas.height = canvasDimensions.height;
-farCanvas.width = canvasDimensions.width;
-farCanvas.height = canvasDimensions.height;
-
-const scale = canvasDimensions.width / image.width;
-const focus = 5000; // 500000000 // breaks down in vanilla canvas
-
-const diff = -image.height * 0;
-
-const mkImage = ({ x, y, image }) => ({
-  x,
-  y,
-  data: image.data,
-  width: image.width,
-  height: image.height,
+[referenceCanvas, farNearCanvas, farFarCanvas].forEach((canvas) => {
+  canvas.width = canvasDimensions.width;
+  canvas.height = canvasDimensions.height;
 });
 
-const images = [
-  mkImage({ x: 0, y: focus - 1 * image.height, image }),
-  mkImage({ x: 0, y: focus + 0 * image.height, image }),
-  mkImage({ x: 0, y: focus + 1 * image.height, image }),
-  mkImage({ x: 0, y: focus + 2 * image.height, image }),
-  mkImage({ x: 0, y: focus + 3 * image.height, image }),
-  mkImage({ x: 0, y: focus + 4 * image.height, image }),
-];
+const scale = canvasDimensions.width / image.width;
+const FOCUS_NEAR = 5000;
+const FOCUS_FAR = 500000000;
+const diff = 0;
 
-const rectangles = [
-  { x: 10, y: focus + 20, width: 200, height: 30 },
-  { x: 100, y: focus + 250, width: 200, height: 30 },
-  { x: -10, y: focus - 10, width: 200, height: 30 },
-  { x: 100, y: focus + 400, width: 200, height: 30 },
-  {
-    x: 0,
-    y: focus + 2 * image.height,
-    width: image.width,
-    height: image.height,
-  },
-];
+function defineSceneElements(currentFocus) {
+  return {
+    images: [
+      {
+        x: 0,
+        y: currentFocus - 1 * image.height,
+        data: image.data,
+        width: image.width,
+        height: image.height,
+      },
+      {
+        x: 0,
+        y: currentFocus + 0 * image.height,
+        data: image.data,
+        width: image.width,
+        height: image.height,
+      },
+      {
+        x: 0,
+        y: currentFocus + 1 * image.height,
+        data: image.data,
+        width: image.width,
+        height: image.height,
+      },
+    ],
+    rectangles: [
+      { x: 10, y: currentFocus + 20, width: 200, height: 30 },
+      { x: 100, y: currentFocus + 250, width: 200, height: 30 },
+      { x: -10, y: currentFocus - 10, width: 200, height: 30 },
+      { x: 100, y: currentFocus + 400, width: 200, height: 30 },
+      {
+        x: 0,
+        y: currentFocus + 2 * image.height,
+        width: image.width,
+        height: image.height,
+      },
+    ],
+  };
+}
 
-const contextReference = getReferenceContext2d(
-  document.getElementById("reference"),
-  { x: 0, y: -focus - diff, scale: scale }
-);
-const contextFar = getFarContext2d(document.getElementById("far"), {
+const contextReference = getReferenceContext2d(referenceCanvas, {
   x: 0,
-  y: focus - diff,
+  y: -FOCUS_NEAR - diff,
+  scale: scale,
+});
+
+const contextFarNear = getFarContext2d(farNearCanvas, {
+  x: 0,
+  y: FOCUS_NEAR - diff,
+  scale: scale,
+});
+
+const contextFarFar = getFarContext2d(farFarCanvas, {
+  x: 0,
+  y: FOCUS_FAR - diff,
   scale: scale,
 });
 
 image.data.onload = function () {
-  function render(ctx) {
-    images.forEach((image, i) => {
+  function render(ctx, currentFocusValue, isReference = false) {
+    if (isReference) {
+      ctx.fillStyle = "white";
+      ctx.fillRect(
+        0,
+        0,
+        canvasDimensions.width / scale,
+        canvasDimensions.height / scale
+      );
+    } else {
+      ctx.clearCanvas();
+    }
+
+    const { images, rectangles } = defineSceneElements(currentFocusValue);
+
+    images.forEach((imgDef, i) => {
       ctx.save();
-
-      // Always draw image at its natural width and height
-      ctx.drawImage(image.data, image.x, image.y, image.width, image.height);
-
+      ctx.drawImage(
+        imgDef.data,
+        imgDef.x,
+        imgDef.y,
+        imgDef.width,
+        imgDef.height
+      );
       ctx.beginPath();
-      ctx.strokeStyle = "#803"; // Border color for the image
+      ctx.strokeStyle = "#803";
       ctx.lineWidth = 1;
-      // Draw rectangle around the actual image dimensions being drawn
-      ctx.rect(image.x, image.y, image.width, image.height);
+      ctx.rect(imgDef.x, imgDef.y, imgDef.width, imgDef.height);
       ctx.stroke();
-
       ctx.restore();
     });
-    rectangles.forEach((rectangle) => {
-      ctx.save();
 
+    rectangles.forEach((rectangle) => {
       ctx.save();
       ctx.fillStyle = "#CE0";
       ctx.fillRect(rectangle.x, rectangle.y, rectangle.width, rectangle.height);
-      ctx.restore();
 
-      ctx.save();
       ctx.strokeStyle = "#803";
       ctx.lineWidth = 8;
       ctx.beginPath();
@@ -104,22 +133,21 @@ image.data.onload = function () {
       ctx.moveTo(rectangle.x + rectangle.width, rectangle.y);
       ctx.lineTo(rectangle.x, rectangle.y + rectangle.height);
       ctx.stroke();
-      ctx.restore();
 
-      ctx.save();
       ctx.fillStyle = "#F08";
       ctx.fillText("example", rectangle.x, rectangle.y + 10);
+
       ctx.font = "bold 48px serif";
       ctx.strokeStyle = "#0F8";
       ctx.strokeText("far", rectangle.x, rectangle.y + 48);
       ctx.restore();
-
-      ctx.restore();
     });
   }
 
-  render(contextReference);
-  render(contextFar);
+  render(contextReference, FOCUS_NEAR, true);
+  render(contextFarNear, FOCUS_NEAR, false);
+  render(contextFarFar, FOCUS_FAR, false);
 };
+
 image.data.src =
   "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Saturn_from_Cassini_Orbiter_%282004-10-06%29.jpg/320px-Saturn_from_Cassini_Orbiter_%282004-10-06%29.jpg";
