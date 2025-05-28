@@ -1,6 +1,6 @@
 {
   "name": "@nextml/far-canvas",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Fixes web html5 canvas for big translations (100Mpx)",
   "main": "lib.cjs/index.js",
   "directories": {

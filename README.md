@@ -21,7 +21,7 @@ Far Canvas now supports all Canvas 2D transform operations! When running in a mo
 - ✅ Falls back gracefully to coordinate transformation when transforms aren't available
 
 ```javascript
-import { far } from "@rgba-image/far-canvas";
+import { far } from "@nextml/far-canvas";
 
 const canvas = document.getElementById("myCanvas");
 const ctx = far(canvas, {
@@ -46,7 +46,7 @@ ctx.fillRect(100_000_000, 100_000_000, 100, 100);
 ## Quick Start
 
 ```javascript
-import { far } from "@rgba-image/far-canvas";
+import { far } from "@nextml/far-canvas";
 
 const canvas = document.getElementById("myCanvas");
 
@@ -68,7 +68,7 @@ context.stroke();
 
 ## Install
 
-`npm install @rgba-image/far-canvas`
+`npm install @nextml/far-canvas`
 
 ## Usage
 
@@ -105,9 +105,9 @@ Far Canvas uses two approaches depending on the environment:
 
 Uses Canvas 2D's native transform matrix to efficiently handle large coordinate offsets:
 
-- Applies a single transformation matrix that combines the offset and scale
-- All drawing operations use their original coordinates
-- Leverages hardware acceleration when available
+- Applies a hybrid approach: coordinate transformation for far-canvas offset, native transforms for user operations
+- All drawing operations transform coordinates in JavaScript to avoid precision issues
+- Leverages hardware acceleration for user transforms when available
 - Supports all transform operations seamlessly
 
 ### Fallback Mode (when transforms aren't supported)
@@ -122,4 +122,4 @@ The appropriate mode is automatically selected based on feature detection.
 
 ## License
 
-MIT License
+Apache-2.0
