@@ -90,11 +90,13 @@ describe("Transform support detection", () => {
       "2d"
     );
 
-    // Drawing operations should pass through coordinates unchanged
+    // Drawing operations should transform coordinates (like fallback implementation)
+    // Our fixed transform-aware implementation transforms coordinates in JavaScript
     context.fillRect(100, 200, 50, 60);
-    expect(mockContext.fillRect).toHaveBeenCalledWith(100, 200, 50, 60);
+    // Expected: x=(100-1000)*2=-1800, y=(200-2000)*2=-3600, w=50*2=100, h=60*2=120
+    expect(mockContext.fillRect).toHaveBeenCalledWith(-1800, -3600, 100, 120);
 
-    // User transforms should be applied
+    // User transforms should be applied via setTransform
     context.translate(10, 20);
 
     // Check that setTransform was called with updated matrix

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Font Debug</title>
+</head>
+<body>
+    <h1>Font Size Debug</h1>
+    
+    <h2>Reference Canvas (Native Scaling)</h2>
+    <canvas id="reference" width="400" height="200" style="border: 1px solid black;"></canvas>
+    
+    <h2>Far Canvas</h2>
+    <canvas id="far" width="400" height="200" style="border: 1px solid black;"></canvas>
+    
+    <div id="debug-info"></div>
+
+    <script type="module">
+        import { far } from '../src/index.js';
+        
+        const scale = 2.1875;
+        
+        // Reference canvas setup
+        const refCanvas = document.getElementById('reference');
+        const refCtx = refCanvas.getContext('2d');
+        refCtx.scale(scale, scale);
+        refCtx.translate(0, -50); // Some offset for testing
+        
+        // Far canvas setup  
+        const farCanvas = document.getElementById('far');
+        const farCtx = far(farCanvas, { x: 0, y: 50, scale: scale }).getContext('2d');
+        
+        // Clear both canvases
+        refCtx.fillStyle = 'white';
+        refCtx.fillRect(-200, 0, 400, 200);
+        farCtx.clearCanvas();
+        
+        // Test default font
+        refCtx.fillStyle = 'blue';
+        refCtx.fillText('Default font (ref)', 10, 30);
+        
+        farCtx.fillStyle = 'blue';  
+        farCtx.fillText('Default font (far)', 10, 80);
+        
+        // Test custom font
+        refCtx.font = 'bold 48px serif';
+        refCtx.fillStyle = 'red';
+        refCtx.fillText('48px serif (ref)', 10, 80);
+        
+        farCtx.font = 'bold 48px serif';
+        farCtx.fillStyle = 'red';
+        farCtx.fillText('48px serif (far)', 10, 130);
+        
+        // Debug info
+        const debugInfo = document.getElementById('debug-info');
+        debugInfo.innerHTML = `
+            <h3>Debug Info:</h3>
+            <p>Scale: ${scale}</p>
+            <p>Reference font after setting: ${refCtx.font}</p>
+            <p>Far canvas font after setting: ${farCtx.font}</p>
+            <p>Underlying far canvas font: ${farCanvas.getContext('2d').font}</p>
+        `;
+    </script>
+</body>
+</html> 
