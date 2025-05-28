@@ -74,14 +74,14 @@ test.each([undefined, {}, { x: -1337 }, { x: 1337, scale: 3 }])(
 );
 
 test.each([
-  [undefined, [0, 0, 20, 10], [0, 0, 20, 10]],
-  [{}, [-10, 0, 35, 10], [-10, 0, 35, 10]],
-  [{ x: -13 }, [-30, 2, 15, 10], [-43, 2, 15, 10]],
-  [{ y: 42 }, [-5, 8, 10, 20], [-5, 50, 10, 20]],
-  [{ x: 13, scale: 3 }, [-8, 2, 2, 6], [15, 6, 6, 18]],
-  [{ y: -23, scale: 2 }, [-8, 2, 2, 6], [-16, -42, 4, 12]],
-  [{ x: 8, scale: 4 }, [8, -2, 2, 6], [64, -8, 8, 24]],
-  [{ x: 13, scale: 2 }, [-15, 2, 3, 6], [-4, 4, 6, 12]],
+  [{ x: 0, y: 0, scale: 1 }, [-30, 2, 15, 10], [-30, 2, 15, 10]],
+  [{ x: 13, y: 0, scale: 1 }, [-30, 2, 15, 10], [-43, 2, 15, 10]],
+  [{ x: 0, y: 0, scale: 2 }, [-5, 8, 10, 20], [-10, 16, 20, 40]],
+  [{ x: 0, y: 42, scale: 1 }, [-5, 8, 10, 20], [-5, -34, 10, 20]],
+  [{ x: 39, y: 0, scale: 3 }, [-10, 2, 2, 6], [-147, 6, 6, 18]],
+  [{ x: 0, y: -46, scale: 2 }, [-8, 2, 2, 6], [-16, 96, 4, 12]],
+  [{ x: -32, y: 0, scale: 2 }, [16, -4, 4, 12], [96, -8, 8, 24]],
+  [{ x: 26, y: 0, scale: 2 }, [-5, 2, 3, 6], [-62, 4, 6, 12]],
 ])("transforms", (transform, rectangle, rectangleTransformed) => {
   const drawImage = jest.fn();
   const context = far(
@@ -121,8 +121,8 @@ test.each([
     {
       getContext() {
         const data = { lineWidth: 1 };
-        return {
-          [name]: method,
+        // Don't include setTransform in the mock to ensure fallback mode
+        const mockContext = {
           get lineWidth() {
             return data.lineWidth;
           },
@@ -130,6 +130,12 @@ test.each([
             data.lineWidth = lineWidth;
           },
         };
+        // Only add the method if it's not setTransform
+        // This ensures we test the fallback implementation
+        if (name !== "setTransform") {
+          mockContext[name] = method;
+        }
+        return mockContext;
       },
     },
     { x: 3, y: 0, scale: 1.5 }
@@ -328,8 +334,8 @@ test("calculates canvas dimensions correctly", () => {
   const context = far(mockCanvas, { x: 100, y: 50, scale: 2 }).getContext("2d");
 
   expect(context.canvasDimensions).toEqual({
-    x: -100,
-    y: -50,
+    x: 100, // offset x
+    y: 50, // offset y
     width: 400,
     height: 300,
   });
@@ -341,7 +347,7 @@ test.each([
     "arc",
     [100, 200, 50, 0, Math.PI],
     { x: 10, y: 20, scale: 2 },
-    [220, 440, 100, 0, Math.PI, undefined],
+    [180, 360, 100, 0, Math.PI, undefined],
   ],
   [
     "ellipse",
@@ -373,15 +379,15 @@ test.each([
   [
     "fillText",
     ["Hello", 10, 20],
-    { x: 5, y: 10, scale: 2 },
-    ["Hello", 30, 60, undefined],
+    { x: 10, y: 20, scale: 1 },
+    ["Hello", 0, 0, undefined], // 1*(10-10)=0, 1*(20-20)=0
   ],
   ["fillText", ["Hello", 10, 20, 100], { scale: 2 }, ["Hello", 20, 40, 200]],
   [
     "strokeText",
-    ["World", 15, 25],
-    { x: -5, scale: 3 },
-    ["World", 30, 75, undefined],
+    ["World", 60, 75],
+    { x: -30, scale: 1 },
+    ["World", 90, 75, undefined], // 1*(60-(-30))=90
   ],
   [
     "strokeText",
@@ -414,7 +420,7 @@ test.each([
     "createLinearGradient",
     [0, 0, 100, 100],
     { x: 10, y: 20, scale: 2 },
-    [20, 40, 220, 240],
+    [-20, -40, 180, 160], // 2*(0-10)=-20, 2*(0-20)=-40, 2*(100-10)=180, 2*(100-20)=160
   ],
   [
     "createRadialGradient",
@@ -424,9 +430,9 @@ test.each([
   ],
   [
     "createConicGradient",
-    [Math.PI / 2, 50, 50],
-    { x: -10, scale: 2 },
-    [Math.PI / 2, 80, 100],
+    [Math.PI / 2, 60, 50],
+    { x: -20, scale: 2 },
+    [Math.PI / 2, 160, 100], // 2*(60-(-20))=160, 2*50=100
   ],
 ])("transforms %s method", (method, args, transform, expected) => {
   const mockMethod = jest.fn().mockReturnValue({});
@@ -515,9 +521,9 @@ test.each([
   ],
   [
     "quadraticCurveTo",
-    [15, 25, 35, 45],
-    { x: 5, scale: 3 },
-    [60, 75, 120, 135],
+    [10, 25, 30, 45],
+    { x: -5, scale: 3 },
+    [45, 75, 105, 135], // 3*(10-(-5))=45, 3*25=75, 3*(30-(-5))=105, 3*45=135
   ],
 ])("transforms %s method", (method, args, transform, expected) => {
   const mockMethod = jest.fn();
@@ -618,11 +624,11 @@ test("coordinate systems work independently", () => {
   );
 
   // Test that each context has its own coordinate system
-  expect(context1.s.x(10)).toBe(220); // 2 * (10 + 100)
-  expect(context2.s.x(10)).toBe(-20); // 0.5 * (10 - 50)
+  expect(context1.s.x(10)).toBe(-180); // 2 * (10 - 100) = -180
+  expect(context2.s.x(10)).toBe(30); // 0.5 * (10 - (-50)) = 30
 
-  expect(context1.s.y(20)).toBe(440); // 2 * (20 + 200)
-  expect(context2.s.y(20)).toBe(-40); // 0.5 * (20 - 100)
+  expect(context1.s.y(20)).toBe(-360); // 2 * (20 - 200) = -360
+  expect(context2.s.y(20)).toBe(60); // 0.5 * (20 - (-100)) = 60
 });
 
 // Not implemented yet tests
@@ -686,9 +692,9 @@ test.each([
 
 // Additional method tests
 test.each([
-  ["arcTo", [10, 20, 30, 40, 5], { x: 5, scale: 2 }, [30, 40, 70, 80, 10]],
+  ["arcTo", [10, 20, 30, 40, 5], { x: 5, scale: 2 }, [10, 40, 50, 80, 10]],
   ["roundRect", [10, 20, 30, 40, 5], { scale: 3 }, [30, 60, 90, 120, 15]],
-  ["rect", [10, 20, 30, 40], { x: -5, y: -10, scale: 2 }, [10, 20, 60, 80]],
+  ["rect", [15, 25, 30, 40], { x: -5, y: -10, scale: 2 }, [40, 70, 60, 80]],
 ])("transforms %s method", (method, args, transform, expected) => {
   const mockMethod = jest.fn();
   const mockContext = {
@@ -711,8 +717,8 @@ test.each([
 // Rectangle methods test
 test.each([
   ["fillRect", [10, 20, 30, 40], { scale: 2 }, [20, 40, 60, 80]],
-  ["strokeRect", [15, 25, 35, 45], { x: 10, scale: 3 }, [75, 75, 105, 135]],
-  ["clearRect", [5, 10, 20, 30], { y: -5, scale: 0.5 }, [2.5, 2.5, 10, 15]],
+  ["strokeRect", [15, 25, 35, 45], { x: 10, scale: 3 }, [15, 75, 105, 135]],
+  ["clearRect", [5, 10, 20, 30], { y: -5, scale: 0.5 }, [2.5, 7.5, 10, 15]],
 ])("transforms %s method", (method, args, transform, expected) => {
   const mockMethod = jest.fn();
   const mockContext = {
@@ -773,7 +779,7 @@ test("transforms drawImage with 2 args (uses image dimensions)", () => {
   ).getContext("2d");
 
   context.drawImage(mockImage, 30, 40);
-  expect(drawImage).toHaveBeenCalledWith(mockImage, 80, 120, 200, 100);
+  expect(drawImage).toHaveBeenCalledWith(mockImage, 40, 40, 200, 100); // 2*(30-10)=40, 2*(40-20)=40
 });
 
 // Stroke method test

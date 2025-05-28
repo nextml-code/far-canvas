@@ -1,34 +1,165 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <title>Far Canvas Example</title>
         <style>
             body {
-                background: #CEF;
+                background: #E6E6FA; /* Lighter lavender background */
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                margin: 0;
+                color: #333;
             }
-            div {
-                display: inline-block;
+            .header {
+                background: #4A4A4A; /* Darker header */
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                text-align: center;
+            }
+            .header h1 {
+                margin: 0;
+            }
+            .container {
+                display: flex;
+                flex-wrap: wrap; /* Allow wrapping on smaller screens */
+                gap: 30px; /* Increased gap */
+                justify-content: center; /* Center canvas wrappers */
+            }
+            .canvas-wrapper {
+                text-align: center;
+                background: white;
+                padding: 20px;
+                border-radius: 12px; /* More rounded corners */
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Softer shadow */
+                flex: 1; /* Allow flex shrinking/growing */
+                min-width: 350px; /* Minimum width before wrapping */
             }
             #reference_container {
-                border: solid green 1px;
+                border: 3px solid #28a745; /* Green border for reference */
             }
             #far_container {
-                border: solid red 1px;
+                border: 3px solid #dc3545; /* Red border for far-canvas */
+            }
+            canvas {
+                background: white; /* Explicit white background for canvas */
+                display: block; /* Remove extra space below canvas */
+                margin: 0 auto 10px auto; /* Center canvas and add margin below */
+            }
+            .info-box {
+                background: #fff;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 30px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .info-box h2 {
+                margin-top: 0;
+                color: #007bff; /* Blue for section titles */
+            }
+            code {
+                background: #f0f2f5; /* Lighter code background */
+                padding: 3px 6px;
+                border-radius: 4px;
+                font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+                color: #c7254e; /* Pinkish for code text */
+            }
+            ul {
+                padding-left: 20px;
+            }
+            li {
+                margin-bottom: 8px;
+            }
+            .highlight {
+                font-weight: bold;
+                color: #17a2b8; /* Teal for highlights */
+            }
+            .note {
+                font-size: 0.9em;
+                color: #5a5a5a;
+                margin-top: 15px;
+                border-left: 3px solid #ffc107; /* Yellow border for notes */
+                padding-left: 10px;
             }
         </style>
     </head>
     <body>
-        <div>
-            <div id="reference_container" class="canvas_container">
-                <canvas id="reference" width="8" height="8"></canvas>
-            </div>
-            <h3 style="text-align: center">reference</h3>
+        <div class="header">
+            <h1>Far-Canvas: Precision at Large Coordinates</h1>
         </div>
-        <div>
-            <div id="far_container" class="canvas_container">
-                <canvas id="far" width="8" height="8"></canvas>
-            </div>
-            <h3 style="text-align: center">far</h3>
+
+        <div class="info-box">
+            <h2>About This Example</h2>
+            <p>This page demonstrates the core problem far-canvas solves: maintaining rendering precision at large coordinate offsets where the standard HTML5 Canvas API can struggle.</p>
+            <p>Two canvases are displayed side-by-side:</p>
+            <ul>
+                <li><strong>Left (Green Border):</strong> Standard HTML5 Canvas. This is our "reference."</li>
+                <li><strong>Right (Red Border):</strong> The <code>far-canvas</code> implementation.</li>
+            </ul>
+            <p>Both are attempting to render the exact same scene, with images and shapes conceptually positioned at very large Y-coordinates.</p>
         </div>
+
+        <div class="info-box">
+            <h2>Testing Different Offsets</h2>
+            <p>You can control the "far-ness" by editing the <code>focus</code> variable in <code>example/example.js</code>.</p>
+            <ol>
+                <li>Open <code>example/example.js</code> in your code editor.</li>
+                <li>Find the line: <code>const focus = 5000;</code></li>
+                <li>Change <code>5000</code> to other values, for example:
+                    <ul>
+                        <li><code>0</code>: Renders at the origin. Both canvases should be identical.</li>
+                        <li><code>100000</code> (100 thousand): Both should still look good.</li>
+                        <li><code class="highlight">500000000</code> (500 million): This is where vanilla canvas (left) may show significant issues.</li>
+                        <li><code>1000000000</code> (1 billion) or higher: Observe how artifacts worsen on the left.</li>
+                    </ul>
+                </li>
+                <li>Save the file. The browser page should auto-refresh if <code>npm run example</code> (which uses <code>live-server</code>) is running.</li>
+            </ol>
+            <p class="note">The goal is to have the <span style="color:green; font-weight:bold;">Reference Canvas</span> draw the content *as if* it's at the large <code>focus</code> coordinate (by translating its context). The <span style="color:red; font-weight:bold;">Far Canvas</span> is initialized with this <code>focus</code> offset and handles the large coordinates internally.</p>
+        </div>
+
+        <div class="info-box">
+            <h2>What to Look For (at large <code>focus</code> values)</h2>
+            <p>When <code>focus</code> is set to a large value (e.g., 500,000,000 or more):</p>
+            <ul>
+                <li><strong>Reference Canvas (Left/Green):</strong>
+                    <ul>
+                        <li>Lines might become diagonal or jagged.</li>
+                        <li>Shapes might be distorted or misplaced.</li>
+                        <li>Text rendering can be severely affected.</li>
+                        <li>Gradients might appear as solid colors or have incorrect stops.</li>
+                        <li>Overall loss of precision and detail.</li>
+                    </ul>
+                </li>
+                <li><strong>Far Canvas (Right/Red):</strong>
+                    <ul>
+                        <li>Should maintain straight lines and correct shapes.</li>
+                        <li>Text should render clearly.</li>
+                        <li>Gradients should be smooth (though we identified a bug with gradient coordinate transformation at extreme offsets that needs fixing in <code>far-canvas</code> itself).</li>
+                        <li>Overall precision should be preserved.</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div class="container">
+            <div class="canvas-wrapper">
+                <h3>Reference (Vanilla Canvas)</h3>
+                <p>Attempts to render at large coordinates via context translation.</p>
+                <div id="reference_container">
+                    <canvas id="reference" width="8" height="8"></canvas>
+                </div>
+            </div>
+            <div class="canvas-wrapper">
+                <h3>Far Canvas</h3>
+                <p>Renders at large coordinates using <code>far-canvas</code> transformations.</p>
+                <div id="far_container">
+                    <canvas id="far" width="8" height="8"></canvas>
+                </div>
+            </div>
+        </div>
+
         <script type="application/javascript" src="../lib.web/index.js"></script>
         <script type="application/javascript" src="./example.js"></script>
     </body>

@@ -24,7 +24,7 @@ farCanvas.width = canvasDimensions.width;
 farCanvas.height = canvasDimensions.height;
 
 const scale = canvasDimensions.width / image.width;
-const focus = 10000; // 500000000 // breaks down in vanilla canvas
+const focus = 5000; // 500000000 // breaks down in vanilla canvas
 
 const diff = -image.height * 0;
 
@@ -64,7 +64,7 @@ const contextReference = getReferenceContext2d(
 );
 const contextFar = getFarContext2d(document.getElementById("far"), {
   x: 0,
-  y: -focus - diff,
+  y: focus - diff,
   scale: scale,
 });
 
@@ -73,20 +73,13 @@ image.data.onload = function () {
     images.forEach((image, i) => {
       ctx.save();
 
-      if (i == 1) {
-        ctx.drawImage(image.data, image.x, image.y);
-      } else {
-        ctx.drawImage(
-          image.data,
-          image.x,
-          image.y,
-          image.width - i * 32,
-          image.height
-        );
-      }
+      // Always draw image at its natural width and height
+      ctx.drawImage(image.data, image.x, image.y, image.width, image.height);
+
       ctx.beginPath();
-      ctx.strokeStyle = "#803";
+      ctx.strokeStyle = "#803"; // Border color for the image
       ctx.lineWidth = 1;
+      // Draw rectangle around the actual image dimensions being drawn
       ctx.rect(image.x, image.y, image.width, image.height);
       ctx.stroke();
 
