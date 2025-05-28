@@ -1,83 +1,125 @@
-# far-canvas
+# Far Canvas
 
-## install
+Render 2D canvas content at large coordinates with ease.
 
-```bash
-npm install @nextml/far-canvas
-```
+## The problem
 
-## motivation
+When rendering 2D canvas content at large coordinates, you may experience issues with precision. For example, drawing a horizontal line from `(100_000_000, 0.5)` to `(100_000_001, 0.5)` may render a diagonal line, or no line at all.
 
-For example: translated `100'000'000px` away from the center (and a scaling of 1.5) and rendering the objects that far away:
+## The solution
 
-### vanilla canvas exapmle at 0px translation
+Far Canvas is a wrapper around the HTML5 2D canvas API that avoids precision issues at large coordinates.
 
-<img
-  src="static/reference-canvas.png"
-  alt="vanilla canvas example"
-  title="Vanilla Canvas Example"
-  style="display: inline-block; margin: 0 auto;">
+## NEW: Transform Support
 
-### vanilla canvas example at 100Mpx translation
+Far Canvas now supports all Canvas 2D transform operations! When running in a modern browser or environment with full Canvas 2D support, far-canvas will automatically use a Transform-Aware implementation that:
 
-<img
-  src="static/vanilla-canvas.png"
-  alt="vanilla canvas example"
-  title="Vanilla Canvas Example"
-  style="display: inline-block; margin: 0 auto;">
-
-### far canvas example at 100Mpx translation
-
-<img
-  src="static/far-canvas.png"
-  alt="far canvas example"
-  title="Far Canvas Example"
-  style="display: inline-block; margin: 0 auto;">
-
-1. Images, rectangles and lines are all missaligned.
-2. `lineWidth=8px` is not rendered correctly.
-
-## usage
-
-### Node
+- ✅ Supports `translate()`, `rotate()`, `scale()`, `transform()`, `setTransform()`, and `resetTransform()`
+- ✅ Supports `getTransform()` to retrieve the current transformation matrix
+- ✅ Leverages hardware-accelerated native Canvas transforms for better performance
+- ✅ Maintains the same precision guarantees for large coordinates
+- ✅ Falls back gracefully to coordinate transformation when transforms aren't available
 
 ```javascript
-const { far } = require("../lib.cjs/index.js");
+import { far } from "@rgba-image/far-canvas";
 
-const farAway = 100000000;
-const context = far(canvas, {y: -farAway, scale: 2}).getContext("2d");
+const canvas = document.getElementById("myCanvas");
+const ctx = far(canvas, {
+  x: 100_000_000, // Render with huge coordinate offset
+  y: 100_000_000,
+  scale: 2,
+}).getContext("2d");
 
-context.clearCanvas();
-context.fillRect(32, farAway + 16, 128, 128);
+// All transform operations now work!
+ctx.save();
+ctx.translate(50, 50);
+ctx.rotate(Math.PI / 4);
+ctx.scale(1.5, 1.5);
+ctx.fillRect(-25, -25, 50, 50);
+ctx.restore();
 
-context.canvas; // underlying canvas for which the default unit is pixels
-context.s; // coordinate system
-context.s.inv; // inverse coordinate system
-
-...
+// Draw at world coordinates - far-canvas handles the offset
+ctx.fillStyle = "red";
+ctx.fillRect(100_000_000, 100_000_000, 100, 100);
 ```
 
-### Web
+## Quick Start
 
 ```javascript
-const canvas = document.getElementById('far');
+import { far } from "@rgba-image/far-canvas";
 
-const farAway = 100000000;
-const context = far.far(canvas, {y: -farAway, scale: 2}).getContext("2d");
+const canvas = document.getElementById("myCanvas");
 
-...
+const myFarCanvas = far(canvas, {
+  x: 100_000_000,
+  y: 0,
+  scale: 2,
+});
+
+const context = myFarCanvas.getContext("2d");
+
+// This will be a horizontal line!
+context.strokeStyle = "red";
+context.beginPath();
+context.moveTo(100_000_000, 0.5);
+context.lineTo(100_000_001, 0.5);
+context.stroke();
 ```
 
-## development
+## Install
 
-### run example
+`npm install @rgba-image/far-canvas`
 
-```bash
-npm run example
-```
+## Usage
 
-### update version
+### `far( canvas: HTMLCanvasElement, options?: FarCanvasOptions ): FarCanvas`
 
-```bash
-npm version patch | minor | major
-```
+Creates a far canvas instance. Options are:
+
+- `x`: The x offset to apply to all drawing operations (default: 0)
+- `y`: The y offset to apply to all drawing operations (default: 0)
+- `scale`: The scale to apply to all drawing operations (default: 1)
+
+### `FarCanvas`
+
+The far canvas instance has a single method:
+
+- `getContext( '2d' )`: Returns a `FarCanvasRenderingContext2D`
+
+### `FarCanvasRenderingContext2D`
+
+The far canvas rendering context implements the full [`CanvasRenderingContext2D`](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D) interface, with the following additions:
+
+- `clearCanvas()`: Clears the entire canvas (ignoring any transforms)
+- `canvasDimensions`: Returns the dimensions of the canvas in the far coordinate system
+
+When transform support is available (modern browsers), all transform methods work as expected. In fallback mode, the following methods will throw an error:
+
+- `translate()`, `rotate()`, `scale()`, `transform()`, `setTransform()`, `resetTransform()`, `getTransform()`
+
+## How it works
+
+Far Canvas uses two approaches depending on the environment:
+
+### Transform-Aware Mode (when `setTransform` is available)
+
+Uses Canvas 2D's native transform matrix to efficiently handle large coordinate offsets:
+
+- Applies a single transformation matrix that combines the offset and scale
+- All drawing operations use their original coordinates
+- Leverages hardware acceleration when available
+- Supports all transform operations seamlessly
+
+### Fallback Mode (when transforms aren't supported)
+
+Falls back to coordinate transformation:
+
+- Intercepts all drawing calls and transforms coordinates before passing to the underlying context
+- Ensures compatibility with older browsers or limited Canvas implementations
+- Transform operations are not supported in this mode
+
+The appropriate mode is automatically selected based on feature detection.
+
+## License
+
+MIT License
