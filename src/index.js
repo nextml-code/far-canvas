@@ -205,7 +205,8 @@ const getFarContext2d = (canvas, { x = 0, y = 0, scale = 1 } = {}) => {
         s.y(y),
         s.distance(radius),
         startAngle,
-        endAngle
+        endAngle,
+        counterclockwise
       );
     },
     arcTo(x1, y1, x2, y2, radius) {
