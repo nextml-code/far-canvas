@@ -370,7 +370,7 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       );
     },
     createPattern(image, repetition) {
-      throw new Error("createPattern not implemented yet");
+      return _context.createPattern(image, repetition);
     },
     createRadialGradient(x0, y0, r0, x1, y1, r1) {
       return _context.createRadialGradient(
@@ -504,7 +504,46 @@ const getTransformAwareContext = (_context, canvas, { x, y, scale }) => {
       return _context.lineTo(farTransform.x(worldX), farTransform.y(worldY));
     },
     measureText(text) {
-      throw new Error("measureText not implemented yet");
+      // Get the text metrics from the underlying context
+      const metrics = _context.measureText(text);
+
+      // Create a scaled TextMetrics object
+      // The underlying context has scaled font, so we need to inverse-scale the measurements
+      // to return them in world coordinates
+      return {
+        width: farTransform.inv.distance(metrics.width),
+        actualBoundingBoxLeft: farTransform.inv.distance(
+          metrics.actualBoundingBoxLeft || 0
+        ),
+        actualBoundingBoxRight: farTransform.inv.distance(
+          metrics.actualBoundingBoxRight || 0
+        ),
+        actualBoundingBoxAscent: farTransform.inv.distance(
+          metrics.actualBoundingBoxAscent || 0
+        ),
+        actualBoundingBoxDescent: farTransform.inv.distance(
+          metrics.actualBoundingBoxDescent || 0
+        ),
+        fontBoundingBoxAscent: farTransform.inv.distance(
+          metrics.fontBoundingBoxAscent || 0
+        ),
+        fontBoundingBoxDescent: farTransform.inv.distance(
+          metrics.fontBoundingBoxDescent || 0
+        ),
+        emHeightAscent: farTransform.inv.distance(metrics.emHeightAscent || 0),
+        emHeightDescent: farTransform.inv.distance(
+          metrics.emHeightDescent || 0
+        ),
+        hangingBaseline: farTransform.inv.distance(
+          metrics.hangingBaseline || 0
+        ),
+        alphabeticBaseline: farTransform.inv.distance(
+          metrics.alphabeticBaseline || 0
+        ),
+        ideographicBaseline: farTransform.inv.distance(
+          metrics.ideographicBaseline || 0
+        ),
+      };
     },
     moveTo(worldX, worldY) {
       return _context.moveTo(farTransform.x(worldX), farTransform.y(worldY));
@@ -917,7 +956,7 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
       return _context.createLinearGradient(s.x(x0), s.y(y0), s.x(x1), s.y(y1));
     },
     createPattern(image, repetition) {
-      notImplementedYet("createPattern");
+      return _context.createPattern(image, repetition);
     },
     createRadialGradient(x0, y0, r0, x1, y1, r1) {
       return _context.createRadialGradient(
@@ -1039,8 +1078,38 @@ const getCoordinateTransformContext = (_context, canvas, { x, y, scale }) => {
       return _context.lineTo(s.x(x), s.y(y));
     },
     measureText(text) {
-      // requires TextMetrics wrap
-      notImplementedYet("measureText");
+      // Get the text metrics from the underlying context
+      const metrics = _context.measureText(text);
+
+      // Create a scaled TextMetrics object
+      // The underlying context has scaled font, so we need to inverse-scale the measurements
+      // to return them in world coordinates
+      return {
+        width: s.inv.distance(metrics.width),
+        actualBoundingBoxLeft: s.inv.distance(
+          metrics.actualBoundingBoxLeft || 0
+        ),
+        actualBoundingBoxRight: s.inv.distance(
+          metrics.actualBoundingBoxRight || 0
+        ),
+        actualBoundingBoxAscent: s.inv.distance(
+          metrics.actualBoundingBoxAscent || 0
+        ),
+        actualBoundingBoxDescent: s.inv.distance(
+          metrics.actualBoundingBoxDescent || 0
+        ),
+        fontBoundingBoxAscent: s.inv.distance(
+          metrics.fontBoundingBoxAscent || 0
+        ),
+        fontBoundingBoxDescent: s.inv.distance(
+          metrics.fontBoundingBoxDescent || 0
+        ),
+        emHeightAscent: s.inv.distance(metrics.emHeightAscent || 0),
+        emHeightDescent: s.inv.distance(metrics.emHeightDescent || 0),
+        hangingBaseline: s.inv.distance(metrics.hangingBaseline || 0),
+        alphabeticBaseline: s.inv.distance(metrics.alphabeticBaseline || 0),
+        ideographicBaseline: s.inv.distance(metrics.ideographicBaseline || 0),
+      };
     },
     moveTo(x, y) {
       return _context.moveTo(s.x(x), s.y(y));

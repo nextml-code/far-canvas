@@ -653,8 +653,6 @@ test("coordinate systems work independently", () => {
 
 // Not implemented yet tests
 test.each([
-  ["createPattern", ["image", "repeat"], "not implemented"],
-  ["measureText", ["text"], "not implemented"],
   ["getImageData", [0, 0, 100, 100], "not implemented"],
   ["putImageData", ["imageData", 0, 0], "not implemented"],
   ["drawFocusIfNeeded", ["element"], "not implemented"],
@@ -678,6 +676,82 @@ test.each([
     expect(() => context[method](...args)).toThrow(errorSubstring);
   }
 );
+
+// createPattern implementation test
+test("createPattern returns pattern from underlying context", () => {
+  const mockPattern = { type: "pattern" }; // Mock pattern object
+  const mockContext = {
+    get lineWidth() {
+      return 1;
+    },
+    set lineWidth(v) {},
+    createPattern: jest.fn().mockReturnValue(mockPattern),
+  };
+
+  const context = far(
+    { getContext: jest.fn().mockReturnValue(mockContext) },
+    { scale: 2 }
+  ).getContext("2d");
+
+  const mockImage = { width: 100, height: 100 };
+  const result = context.createPattern(mockImage, "repeat");
+
+  // Verify the underlying createPattern was called with the same arguments
+  expect(mockContext.createPattern).toHaveBeenCalledWith(mockImage, "repeat");
+
+  // Verify the pattern is returned as-is (no transformation needed)
+  expect(result).toBe(mockPattern);
+});
+
+// measureText implementation test
+test("measureText returns scaled TextMetrics", () => {
+  const mockTextMetrics = {
+    width: 100,
+    actualBoundingBoxLeft: 10,
+    actualBoundingBoxRight: 90,
+    actualBoundingBoxAscent: 20,
+    actualBoundingBoxDescent: 5,
+    fontBoundingBoxAscent: 25,
+    fontBoundingBoxDescent: 8,
+    emHeightAscent: 22,
+    emHeightDescent: 6,
+    hangingBaseline: 18,
+    alphabeticBaseline: 0,
+    ideographicBaseline: -3,
+  };
+
+  const mockContext = {
+    get lineWidth() {
+      return 1;
+    },
+    set lineWidth(v) {},
+    measureText: jest.fn().mockReturnValue(mockTextMetrics),
+  };
+
+  const context = far(
+    { getContext: jest.fn().mockReturnValue(mockContext) },
+    { scale: 2 }
+  ).getContext("2d");
+
+  const result = context.measureText("test text");
+
+  // Verify the underlying measureText was called
+  expect(mockContext.measureText).toHaveBeenCalledWith("test text");
+
+  // Verify the returned metrics are properly scaled (inverse scaled from screen to world coordinates)
+  expect(result.width).toBe(50); // 100 / 2
+  expect(result.actualBoundingBoxLeft).toBe(5); // 10 / 2
+  expect(result.actualBoundingBoxRight).toBe(45); // 90 / 2
+  expect(result.actualBoundingBoxAscent).toBe(10); // 20 / 2
+  expect(result.actualBoundingBoxDescent).toBe(2.5); // 5 / 2
+  expect(result.fontBoundingBoxAscent).toBe(12.5); // 25 / 2
+  expect(result.fontBoundingBoxDescent).toBe(4); // 8 / 2
+  expect(result.emHeightAscent).toBe(11); // 22 / 2
+  expect(result.emHeightDescent).toBe(3); // 6 / 2
+  expect(result.hangingBaseline).toBe(9); // 18 / 2
+  expect(result.alphabeticBaseline).toBe(0); // 0 / 2
+  expect(result.ideographicBaseline).toBe(-1.5); // -3 / 2
+});
 
 // Property scaling tests - test that property API works correctly
 test.each([

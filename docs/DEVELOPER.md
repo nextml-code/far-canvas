@@ -323,10 +323,8 @@ In the transform-aware mode, if a property that represents a dimension (e.g., `l
 ## Known Limitations
 
 1. **Path2D**: Not implemented - would require wrapping Path2D objects and transforming their internal commands.
-2. **measureText**: Not implemented - would need TextMetrics wrapping and proper scaling of returned metrics.
-3. **getImageData/putImageData**: Not implemented - complex coordinate mapping and scaling considerations for pixel data.
-4. **createPattern**: Not implemented - pattern transformation complexity.
-5. **isPointInPath/Stroke**: Not implemented - requires path tracking and transformation of test points.
+2. **getImageData/putImageData**: Not implemented - complex coordinate mapping and scaling considerations for pixel data.
+3. **isPointInPath/Stroke**: Not implemented - requires path tracking and transformation of test points.
 
 ## Performance Considerations
 
@@ -338,13 +336,11 @@ In the transform-aware mode, if a property that represents a dimension (e.g., `l
 ## Future Improvements
 
 1. **Path2D Support**: Wrap Path2D to transform path commands.
-2. **Complete TextMetrics**: Implement `measureText` with proper scaling.
-3. **ImageData Methods**: Handle pixel data transformation.
-4. **Pattern Support**: Transform patterns correctly.
-5. **WebGL Context**: Extend to support WebGL rendering (major undertaking).
-6. **Caching**: Add coordinate transformation caching for performance.
-7. **Benchmarks**: Add performance benchmarks, especially comparing transform-aware vs. fallback, and performance at extreme offsets.
-8. **Browser Test Suite Enhancement**: Continuously improve `browser-test.html` and Puppeteer tests to cover more complex scenarios and rendering features.
+2. **ImageData Methods**: Handle pixel data transformation.
+3. **WebGL Context**: Extend to support WebGL rendering (major undertaking).
+4. **Caching**: Add coordinate transformation caching for performance.
+5. **Benchmarks**: Add performance benchmarks, especially comparing transform-aware vs. fallback, and performance at extreme offsets.
+6. **Browser Test Suite Enhancement**: Continuously improve `browser-test.html` and Puppeteer tests to cover more complex scenarios and rendering features.
 
 ## Debugging Tips
 
