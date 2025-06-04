@@ -1,11 +1,13 @@
 const puppeteer = require("puppeteer");
 const PNG = require("pngjs").PNG;
-const pixelmatch = require("pixelmatch").default;
 const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const finalhandler = require("finalhandler"); // npm i finalhandler serve-static
 const serveStatic = require("serve-static"); // npm i finalhandler serve-static
+
+// Dynamic import for ES module
+let pixelmatch;
 
 describe("Browser Visual Consistency Test (Puppeteer with HTTP Server)", () => {
   let browser;
@@ -21,6 +23,9 @@ describe("Browser Visual Consistency Test (Puppeteer with HTTP Server)", () => {
   };
 
   beforeAll(async () => {
+    // Dynamic import for ES module
+    pixelmatch = (await import("pixelmatch")).default;
+
     const htmlPath = path.resolve(PROJECT_ROOT, "example", "browser-test.html");
     const jsPath = path.resolve(PROJECT_ROOT, "src", "index.js");
     const pkgPath = path.resolve(PROJECT_ROOT, "package.json");
