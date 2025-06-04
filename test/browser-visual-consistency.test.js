@@ -6,8 +6,19 @@ const http = require("http");
 const finalhandler = require("finalhandler"); // npm i finalhandler serve-static
 const serveStatic = require("serve-static"); // npm i finalhandler serve-static
 
-// Dynamic import for ES module
+// Handle pixelmatch import (ES module)
 let pixelmatch;
+try {
+  // Try CommonJS first
+  pixelmatch = require("pixelmatch");
+} catch (e) {
+  try {
+    // Try ES module default export
+    pixelmatch = require("pixelmatch").default;
+  } catch (e2) {
+    throw new Error("Could not import pixelmatch: " + e2.message);
+  }
+}
 
 describe("Browser Visual Consistency Test (Puppeteer with HTTP Server)", () => {
   let browser;
@@ -23,9 +34,6 @@ describe("Browser Visual Consistency Test (Puppeteer with HTTP Server)", () => {
   };
 
   beforeAll(async () => {
-    // Dynamic import for ES module
-    pixelmatch = (await import("pixelmatch")).default;
-
     const htmlPath = path.resolve(PROJECT_ROOT, "example", "browser-test.html");
     const jsPath = path.resolve(PROJECT_ROOT, "src", "index.js");
     const pkgPath = path.resolve(PROJECT_ROOT, "package.json");
